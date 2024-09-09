@@ -1,0 +1,36 @@
+import { Injectable } from '@nestjs/common';
+import { CreateAccountingPlanDto } from './dto/create-accounting-plan.dto';
+import { UpdateAccountingPlanDto } from './dto/update-accounting-plan.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { AccountingPlan } from './entities/accounting-plan.entity';
+import { Repository } from 'typeorm';
+
+@Injectable()
+export class AccountingPlanService {
+
+  constructor(
+      @InjectRepository(AccountingPlan)
+      private accountRepository: Repository<AccountingPlan>,
+  ) { }
+
+  async create(createAccountingPlanDto: CreateAccountingPlanDto) {
+    return await this.accountRepository.save(createAccountingPlanDto)
+  }
+
+  async findAll(): Promise<AccountingPlan[]> {
+    return await this.accountRepository.find();
+  }
+
+  findOne(id: number) {
+    return `This action returns a #${id} accountingPlan`;
+  }
+
+  update(id: number, updateAccountingPlanDto: UpdateAccountingPlanDto) {
+    return `This action updates a #${id} accountingPlan`;
+  }
+
+  remove(id: number) {
+    return `This action removes a #${id} accountingPlan`;
+  }
+}
+
