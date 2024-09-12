@@ -32,11 +32,10 @@ export class User {
      @Column({ default: true }) // Puedes definir un valor por defecto si es necesario
      active: boolean;
 
-     @Column({ nullable: true })
+     @Column({ nullable: true, length: 1000  })
      tokens?: string;
 
-     // Esto es pal caso de que no se repita el username en toda la tabla. 
-     //@Column({ unique: true })
-     // username: string;
+     @Column({ nullable: true })
+     prueba?: string;
 }
 

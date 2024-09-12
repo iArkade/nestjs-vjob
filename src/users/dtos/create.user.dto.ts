@@ -43,10 +43,3 @@ export class CreateUserRequestDto {
      tokens?: string;
      
 }
-
-// export class CreateUserRequestDto {
-//      email: string;
-//      password: string;
-//      name?: string;
-//      lastname?: string
-// }

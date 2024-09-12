@@ -53,9 +53,9 @@ export class AuthService {
                if (match) {
                     const payload = {
                          userId: user.id,
-                         // email: user.email,
-                         // name: user.name,
-                         // role: user.role,
+                         email: user.email,
+                         name: user.name,
+                         role: user.role,
                     };
 
                     const token = await this.jwtService.signAsync(payload);
