@@ -9,9 +9,14 @@ import { ApiTags } from '@nestjs/swagger';
 export class AccountingPlanController {
   constructor(private readonly accountingPlanService: AccountingPlanService) {}
 
+  // @Post()
+  // create(@Body() createAccountingPlanDto: CreateAccountingPlanDto) {
+  //   return this.accountingPlanService.create(createAccountingPlanDto);
+  // }
+
   @Post()
-  create(@Body() createAccountingPlanDto: CreateAccountingPlanDto) {
-    return this.accountingPlanService.create(createAccountingPlanDto);
+  create(@Body() createAccountingPlanDto: CreateAccountingPlanDto[]) {
+    return this.accountingPlanService.createMany(createAccountingPlanDto);
   }
 
   @Get()

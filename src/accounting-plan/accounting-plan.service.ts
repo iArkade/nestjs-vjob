@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { CreateAccountingPlanDto } from './dto/create-accounting-plan.dto';
 import { UpdateAccountingPlanDto } from './dto/update-accounting-plan.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -17,6 +17,11 @@ export class AccountingPlanService {
     return await this.accountRepository.save(createAccountingPlanDto)
   }
 
+  async createMany(createAccountingPlanDtos: CreateAccountingPlanDto[]) {
+    // El método save acepta un array de objetos
+    return await this.accountRepository.save(createAccountingPlanDtos);
+  }
+
   async findAll(): Promise<AccountingPlan[]> {
     return await this.accountRepository.find();
   }
@@ -29,8 +34,17 @@ export class AccountingPlanService {
     return `This action updates a #${id} accountingPlan`;
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} accountingPlan`;
+  async remove(id: number) {
+    try {
+      const result = await this.accountRepository.delete({id});
+      // Verifica si algún registro fue afectado (eliminado)
+      if (result.affected === 0) {
+        throw new NotFoundException(`User with ID ${id} not found`);
+      }
+    } catch (error) {
+        throw new InternalServerErrorException(`Failed to delete user with ID ${id}`);
+    }
   }
 }
+
 

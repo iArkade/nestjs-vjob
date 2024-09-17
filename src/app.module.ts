@@ -23,8 +23,7 @@ import { dataSourceOptions } from 'db/data-source';
   imports: [
     TypeOrmModule.forRootAsync({
       useFactory: () => dataSourceOptions
-    }),
-    
+    }), 
     UsersModule,
     AuthModule,
     AccountingPlanModule],

@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsNotEmpty, IsString, MinLength } from "class-validator";
+import { IsNotEmpty, IsOptional, IsString, MinLength } from "class-validator";
 
 export class CreateAccountingPlanDto {
 
@@ -25,5 +25,6 @@ export class CreateAccountingPlanDto {
      })
      @IsNotEmpty()
      @IsString()
+     @IsOptional()
      readonly company_code: string;
 }
