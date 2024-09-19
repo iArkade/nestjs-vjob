@@ -12,7 +12,7 @@ export class AccountingPlan {
      @Column({ nullable: false }) 
      name: string;
 
-     @Column({ unique: true, nullable: true }) 
+     @Column({ unique: true, nullable: true, default: null }) 
      company_code: string;
 
      @CreateDateColumn({ name: 'created_at' })

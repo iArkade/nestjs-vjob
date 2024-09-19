@@ -23,7 +23,6 @@ export class CreateAccountingPlanDto {
           description: 'The name of the company',
           example: 'UDLA',
      })
-     @IsNotEmpty()
      @IsString()
      @IsOptional()
      readonly company_code: string;
