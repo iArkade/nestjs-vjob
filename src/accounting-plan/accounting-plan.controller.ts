@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { AccountingPlanService } from './accounting-plan.service';
 import { CreateAccountingPlanDto } from './dto/create-accounting-plan.dto';
 import { UpdateAccountingPlanDto } from './dto/update-accounting-plan.dto';
@@ -9,19 +9,17 @@ import { ApiTags } from '@nestjs/swagger';
 export class AccountingPlanController {
   constructor(private readonly accountingPlanService: AccountingPlanService) {}
 
-  // @Post()
-  // create(@Body() createAccountingPlanDto: CreateAccountingPlanDto) {
-  //   return this.accountingPlanService.create(createAccountingPlanDto);
-  // }
-
   @Post()
   create(@Body() createAccountingPlanDto: CreateAccountingPlanDto[]) {
     return this.accountingPlanService.createMany(createAccountingPlanDto);
   }
 
   @Get()
-  findAll() {
-    return this.accountingPlanService.findAll();
+  findAll(
+    @Query('page') page: number = 1,  // Página por defecto
+    @Query('limit') limit: number = 10 // Límites por defecto
+  ) {
+    return this.accountingPlanService.findAll(page, limit);
   }
 
   @Get(':id')
@@ -39,4 +37,3 @@ export class AccountingPlanController {
     return this.accountingPlanService.remove(+id);
   }
 }
-

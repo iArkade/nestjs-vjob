@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsNotEmpty, IsOptional, IsString, MinLength } from "class-validator";
+import { IsNotEmpty, IsOptional, IsString, Matches, MinLength } from "class-validator";
 
 export class CreateAccountingPlanDto {
 
@@ -9,6 +9,7 @@ export class CreateAccountingPlanDto {
      })
      @IsNotEmpty()
      @IsString()
+     @Matches(/^\d+(\.\d+)*$/, { message: 'The code must follow the format 1, 1.1, etc.' })
      code: string;
 
      @ApiProperty({
