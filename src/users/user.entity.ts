@@ -32,8 +32,7 @@ export class User {
      @Column({ default: true }) // Puedes definir un valor por defecto si es necesario
      active: boolean;
 
-     @Column({ nullable: true })
+     @Column({ nullable: true, length: 2024 })
      tokens?: string;
-
 }
 
