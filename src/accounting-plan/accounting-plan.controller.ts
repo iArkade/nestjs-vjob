@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Put } from '@nestjs/common';
 import { AccountingPlanService } from './accounting-plan.service';
 import { CreateAccountingPlanDto } from './dto/create-accounting-plan.dto';
 import { UpdateAccountingPlanDto } from './dto/update-accounting-plan.dto';
@@ -27,13 +27,14 @@ export class AccountingPlanController {
     return this.accountingPlanService.findOne(+id);
   }
 
-  @Patch(':id')
+  @Put(':id')
   update(@Param('id') id: string, @Body() updateAccountingPlanDto: UpdateAccountingPlanDto) {
     return this.accountingPlanService.update(+id, updateAccountingPlanDto);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.accountingPlanService.remove(+id);
+  @Delete(':code')
+  remove(@Param('code') code: string) {
+    return this.accountingPlanService.remove(code);
   }
+  
 }
