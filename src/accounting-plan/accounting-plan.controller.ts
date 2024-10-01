@@ -10,8 +10,12 @@ export class AccountingPlanController {
   constructor(private readonly accountingPlanService: AccountingPlanService) {}
 
   @Post()
-  create(@Body() createAccountingPlanDto: CreateAccountingPlanDto[]) {
-    return this.accountingPlanService.createMany(createAccountingPlanDto);
+  async create(@Body() createAccountingPlanDto: CreateAccountingPlanDto | CreateAccountingPlanDto[]) {
+    // Si es un solo objeto, lo convertimos en un array
+    if (!Array.isArray(createAccountingPlanDto)) {
+      createAccountingPlanDto = [createAccountingPlanDto];
+    }
+    return await this.accountingPlanService.createMany(createAccountingPlanDto);
   }
 
   @Get()
@@ -36,5 +40,4 @@ export class AccountingPlanController {
   remove(@Param('code') code: string) {
     return this.accountingPlanService.remove(code);
   }
-  
 }
