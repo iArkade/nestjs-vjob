@@ -26,5 +26,5 @@ export class CreateAccountingPlanDto {
      })
      @IsString()
      @IsOptional()
-     readonly company_code: string;
+     readonly company_code?: string;
 }

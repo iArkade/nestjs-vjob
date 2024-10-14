@@ -59,16 +59,20 @@ export class AccountingPlanService {
   }
 
   async createMany(createAccountingPlanDtos: CreateAccountingPlanDto[]) {
-    if (!Array.isArray(createAccountingPlanDtos)) {
-      throw new TypeError('createAccountingPlanDtos debe ser un array');
-    }
+      if (!Array.isArray(createAccountingPlanDtos)) {
+          throw new TypeError('createAccountingPlanDtos debe ser un array');
+      }
 
-    for (const createAccountingPlanDto of createAccountingPlanDtos) {
-      await this.create(createAccountingPlanDto);
-    }
+      // Filtrar filas vacías o incompletas
+      const validDtos = createAccountingPlanDtos.filter(dto => dto.code && dto.name);
+      for (const createAccountingPlanDto of validDtos) {
+        
+          await this.create(createAccountingPlanDto);
+      }
   }
 
-  async findAll(page: number, limit: number): Promise<{ data: AccountingPlan[], total: number }> {
+
+  async findAllPaginated(page: number, limit: number): Promise<{ data: AccountingPlan[], total: number }> {
     const [result, total] = await this.accountRepository.findAndCount({
       order: { code: 'ASC' },
     });
@@ -82,6 +86,19 @@ export class AccountingPlanService {
     };
   }
 
+  async findAll(): Promise<AccountingPlan[]> {
+    // Traer todos los registros de la base de datos
+    const result = await this.accountRepository.find({
+      order: { code: 'ASC' }, // Ordenar por el campo 'code'
+    });
+  
+    // Ordenar jerárquicamente (igual que en el método paginado)
+    const sortedResult = this.sortAccountsHierarchically(result);
+  
+    return sortedResult;
+  }
+  
+
   async findOne(id: number) {
     const account = await this.accountRepository.findOne({ where: { id } });
     if (!account) throw new NotFoundException('Account not found');
@@ -92,34 +109,47 @@ export class AccountingPlanService {
     const account = await this.accountRepository.findOne({ where: { id } });
     if (!account) throw new NotFoundException('Account not found');
   
-    // Actualizar código
-    if (updateAccountingPlanDto.code) {
-      const newCode = updateAccountingPlanDto.code.trim();
+    // Check if the account has subaccounts
+    const hasSubaccounts = await this.hasSubaccounts(account.code);
   
-      // Validar jerarquía del código
-      const parentCode = newCode.endsWith('.')
-        ? newCode.slice(0, newCode.lastIndexOf('.', newCode.length - 2)) // Para códigos con punto, quitar último punto
-        : newCode.slice(0, newCode.lastIndexOf('.')); // Para subcuentas sin punto
-  
-      // Verificar si el padre existe (con punto al final)
-      const parentExists = await this.accountRepository.findOne({ where: { code: `${parentCode}.` } });
-      if (!parentExists && parentCode) {
-        throw new BadRequestException('El código padre no existe o no termina en un punto.');
+    if (hasSubaccounts) {
+      // If the account has subaccounts, only allow name updates
+      if (updateAccountingPlanDto.code) {
+        throw new BadRequestException('No se puede editar el código de una cuenta que tiene subcuentas.');
       }
   
-      // Verificar si se está intentando duplicar el código
-      const codeAlreadyExists = await this.accountRepository.findOne({ where: { code: newCode } });
-      if (codeAlreadyExists && codeAlreadyExists.id !== id) {
-        throw new BadRequestException('El código ya existe.');
+      if (updateAccountingPlanDto.name) {
+        account.name = updateAccountingPlanDto.name;
+      }
+    } else {
+      // If the account doesn't have subaccounts, allow both code and name updates
+      if (updateAccountingPlanDto.code) {
+        const newCode = updateAccountingPlanDto.code.trim();
+  
+        // Validar jerarquía del código
+        const parentCode = newCode.endsWith('.')
+          ? newCode.slice(0, newCode.lastIndexOf('.', newCode.length - 2)) // Para códigos con punto, quitar último punto
+          : newCode.slice(0, newCode.lastIndexOf('.')); // Para subcuentas sin punto
+  
+        // Verificar si el padre existe (con punto al final)
+        const parentExists = await this.accountRepository.findOne({ where: { code: `${parentCode}.` } });
+        if (!parentExists && parentCode) {
+          throw new BadRequestException('El código padre no existe o no termina en un punto.');
+        }
+  
+        // Verificar si se está intentando duplicar el código
+        const codeAlreadyExists = await this.accountRepository.findOne({ where: { code: newCode } });
+        if (codeAlreadyExists && codeAlreadyExists.id !== id) {
+          throw new BadRequestException('El código ya existe.');
+        }
+  
+        // Actualizar el código sin añadir un punto automáticamente
+        account.code = newCode;
       }
   
-      // Actualizar el código sin añadir un punto automáticamente
-      account.code = newCode;
-    }
-  
-    // Actualizar nombre si se proporciona
-    if (updateAccountingPlanDto.name) {
-      account.name = updateAccountingPlanDto.name;
+      if (updateAccountingPlanDto.name) {
+        account.name = updateAccountingPlanDto.name;
+      }
     }
   
     // Guardar cambios
