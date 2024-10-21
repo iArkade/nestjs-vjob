@@ -42,7 +42,7 @@ export class AuthService {
           try {
                const { email, password } = loginDto;
                const user = await this.userService.findOneByEmail(email);
-
+               console.log(user);
                if (!user) {
                     throw new UnauthorizedException('Email is incorrect');
                }
@@ -52,23 +52,33 @@ export class AuthService {
 
                if (match) {
                     const payload = {
-                         userId: user.id,
+                         id: user.id,
                          email: user.email,
                          name: user.name,
+                         lastname: user.lastname,
                          role: user.role,
                     };
 
-                    const token = await this.jwtService.signAsync(payload);
+                     // Generar nuevo token
+                    const newToken = await this.jwtService.signAsync(payload);
 
-                    const updateUserDto = {
-                         tokens: `${user.tokens ? user.tokens + ', ' : ''}${token}`,
+                    // Limitar el número de tokens activos (por ejemplo, a 5)
+                    let tokensArray = user.tokens ? user.tokens.split(', ') : [];
+                    if (tokensArray.length >= 5) {
+                         // Eliminar el token más antiguo (FIFO - el primer token en la lista)
+                         tokensArray.shift();
+                    }
+
+                    tokensArray.push(newToken);
+                    const updatedUserDto = {
+                         tokens: tokensArray.join(', ')
                     };
 
-                    const updateUser = await this.userService.updateUserToken(user.id, updateUserDto);
+                    const updateUser = await this.userService.updateUserToken(user.id, updatedUserDto);
                     const { active, email: updatedEmail, id, lastname, name, role } = updateUser;
 
                     if (active) {
-                         return { email: updatedEmail, lastname, id, role, name, tokens: token };
+                         return { email: updatedEmail, lastname, id, role, name, tokens: newToken };
                     } else {
                          throw new UnauthorizedException('Invalid credentials, the user is inactive');
                     }
@@ -83,5 +93,32 @@ export class AuthService {
                throw new InternalServerErrorException('An error occurred during login');
           }
      }
+
+     async logout(userId: number, token: string) {
+          const user = await this.userService.findOneById(userId);
+          if (!user || !user.tokens) {
+               throw new UnauthorizedException('User not found or already logged out');
+          }
+          
+          let tokensArray = user.tokens.split(', ');
+          // Eliminar el token actual del array
+          tokensArray = tokensArray.filter(storedToken => storedToken !== token);
+
+          // Actualizar los tokens del usuario
+          const updatedUserDto = {
+               tokens: tokensArray.join(', '),  // Reemplazar la lista de tokens actualizada
+          };
+
+          await this.userService.updateUserToken(userId, updatedUserDto);
+
+          return { message: 'Logout successful' };
+     }
+
+     // Opcional: Logout de todas las sesiones
+     async logoutAllSessions(userId: number): Promise<{ message: string }> {
+          await this.userService.clearAllTokens(userId);
+          return { message: 'Logged out of all sessions' };
+     }
+
 }
 

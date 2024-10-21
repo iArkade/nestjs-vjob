@@ -29,6 +29,12 @@ export class UsersService {
           return result;
      }
 
+     async findOneById(id: number){
+          const result = await this.userRepository.findOneBy({ id });
+          return result;
+     }
+
+
      async createUser(createUserDto: CreateUserRequestDto): Promise<User> {
           return await this.userRepository.save(createUserDto)
      }
@@ -69,14 +75,18 @@ export class UsersService {
 
      async updateUserToken(id: number, updateUserDto: UpdateUserRequestDto):  Promise<User> {
           
-          try {;
-
+          try {
                await this.userRepository.update({ id }, updateUserDto);
                return await this.userRepository.findOneBy({ id });
-
           } catch (error) {
                throw error;
           }
+     }
+
+     //opcional en caso de limpiar todos los tokns de todas las sesiones
+     async clearAllTokens(userId: number): Promise<User> {
+          await this.userRepository.update({ id: userId }, { tokens: '' });
+          return await this.userRepository.findOneBy({ id: userId });
      }
 }
 
