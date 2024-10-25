@@ -6,15 +6,19 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
 import { AccountingPlanModule } from './accounting-plan/accounting-plan.module';
 import { dataSourceOptions } from 'db/data-source';
+import { DatCentroModule } from './dat_centro/dat_centro.module';
+import { AsientoModule } from './asiento/asiento.module';
 
 @Module({
   imports: [
     TypeOrmModule.forRootAsync({
-      useFactory: () => dataSourceOptions
+      useFactory: () => dataSourceOptions,
     }), 
     UsersModule,
     AuthModule,
-    AccountingPlanModule],
+    AccountingPlanModule,
+    DatCentroModule,
+    AsientoModule],
   controllers: [AppController],
   providers: [AppService],
 })

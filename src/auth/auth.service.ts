@@ -42,7 +42,7 @@ export class AuthService {
           try {
                const { email, password } = loginDto;
                const user = await this.userService.findOneByEmail(email);
-               console.log(user);
+               //console.log(user);
                if (!user) {
                     throw new UnauthorizedException('Email is incorrect');
                }
