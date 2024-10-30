@@ -19,7 +19,25 @@ export class AsientoService {
   ) {}
 
 
-  
+  async createAsientoWithItems(createAsientoDto: CreateAsientoDto) {
+    const { lineItems, ...asientoData } = createAsientoDto;
+    console.log(createAsientoDto, "Hasta aqui si llega")
+    const asiento = this.asientoRepository.create(asientoData);
+    const savedAsiento = await this.asientoRepository.save(asiento);
+
+    const asientoItems = lineItems.map((item, index) => {
+        return this.asientoItemRepository.create({
+            ...item,
+            nro_asiento: savedAsiento.nro_asiento,
+            nro_linea: index + 1,
+        });
+    });
+
+    await this.asientoItemRepository.save(asientoItems);
+
+    return savedAsiento;
+  }
+
   async createAsiento(createAsientoDto: CreateAsientoDto): Promise<Asiento> {
     const asiento = this.asientoRepository.create(createAsientoDto);
     return this.asientoRepository.save(asiento);

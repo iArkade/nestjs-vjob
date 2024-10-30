@@ -30,7 +30,7 @@ export class Asiento {
      @Column()
      codigo_centro: string;
 
-     @Column()
+     @Column({ nullable: true })
      codigo_empresa: string;
 
      @Column({ type: 'decimal', precision: 10, scale: 2 })

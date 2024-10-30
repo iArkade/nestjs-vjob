@@ -6,13 +6,13 @@ import { CreateAsientoItemDto } from './dto/create-asiento-item.dto';
 import { ApiTags } from '@nestjs/swagger';
 
 @ApiTags('asientos')
-@Controller('asiento')
+@Controller('asientos')
 export class AsientoController {
   constructor(private readonly asientoService: AsientoService) {}
 
   @Post()
   createAsiento(@Body() createAsientoDto: CreateAsientoDto) {
-    return this.asientoService.createAsiento(createAsientoDto);
+    return this.asientoService.createAsientoWithItems(createAsientoDto);
   }
 
   @Get(':id')

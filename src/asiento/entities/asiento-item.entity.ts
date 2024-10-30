@@ -7,17 +7,26 @@ export class AsientoItem {
      @PrimaryGeneratedColumn()
      id: number;
 
-     @Column()
-     nro_asiento: string;
+     // @Column()
+     // nro_asiento: string;
+
+     // @Column()
+     // nro_linea: number;
+
+     // @Column()
+     // codigo_contable: string;
 
      @Column()
-     nro_linea: number;
-
-     @Column()
-     codigo_contable: string;
+     id_asiento_item: string;
 
      @Column()
      codigo_centro: string;
+
+     @Column()
+     cta: string;
+
+     @Column()
+     cta_nombre: string;
 
      @Column({ type: 'decimal', precision: 10, scale: 2 })
      debe: number;

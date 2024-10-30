@@ -1,5 +1,7 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsDate, IsDecimal, IsOptional, IsString } from "class-validator";
+import { Type } from "class-transformer";
+import { IsArray, IsDate, IsDecimal, IsOptional, IsString, ValidateNested } from "class-validator";
+import { CreateAsientoItemDto } from "./create-asiento-item.dto";
 
 export class CreateAsientoDto {
 
@@ -83,5 +85,10 @@ export class CreateAsientoDto {
      })
      @IsDecimal()
      total_haber: number;
+
+     @IsArray()
+     @ValidateNested({ each: true })
+     @Type(() => CreateAsientoItemDto)
+     lineItems: CreateAsientoItemDto[];
 
 }
