@@ -9,7 +9,7 @@ export class Asiento {
      @Column({ type: 'date' })
      fecha_emision: Date;
 
-     @Column({ unique: true })
+     @Column({ nullable: true })
      nro_asiento: string;
 
      @Column({ nullable: true })

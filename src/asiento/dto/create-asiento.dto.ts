@@ -70,6 +70,7 @@ export class CreateAsientoDto {
           example: 'EMP001',
      })
      @IsString()
+     @IsOptional()
      codigo_empresa: string;
 
      @ApiProperty({

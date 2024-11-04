@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpException, HttpStatus } from '@nestjs/common';
 import { AsientoService } from './asiento.service';
 import { CreateAsientoDto } from './dto/create-asiento.dto';
 import { UpdateAsientoDto } from './dto/update-asiento.dto';
@@ -11,8 +11,24 @@ export class AsientoController {
   constructor(private readonly asientoService: AsientoService) {}
 
   @Post()
-  createAsiento(@Body() createAsientoDto: CreateAsientoDto) {
-    return this.asientoService.createAsientoWithItems(createAsientoDto);
+  async createAsiento(@Body() createAsientoDto: CreateAsientoDto) {
+    try {
+        // Llama al servicio para crear el Asiento y sus AsientoItem asociados
+        const newAsiento = await this.asientoService.createAsientoWithItems(createAsientoDto);
+        return {
+            message: 'Asiento creado exitosamente',
+            data: newAsiento,
+        };
+    } catch (error) {
+        // Manejo de errores en caso de fallo al crear el Asiento
+        throw new HttpException(
+            {
+                message: 'Error al crear el asiento',
+                error: error.message,
+            },
+            HttpStatus.INTERNAL_SERVER_ERROR
+        );
+    }
   }
 
   @Get(':id')

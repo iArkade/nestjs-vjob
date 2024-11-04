@@ -25,16 +25,15 @@ export class AsientoService {
     const asiento = this.asientoRepository.create(asientoData);
     const savedAsiento = await this.asientoRepository.save(asiento);
 
-    const asientoItems = lineItems.map((item, index) => {
+    const asientoItems = lineItems.map((item) => {
         return this.asientoItemRepository.create({
             ...item,
-            nro_asiento: savedAsiento.nro_asiento,
-            nro_linea: index + 1,
+            asiento: savedAsiento,
         });
     });
 
     await this.asientoItemRepository.save(asientoItems);
-
+    
     return savedAsiento;
   }
 
