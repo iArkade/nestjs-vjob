@@ -16,8 +16,8 @@ export class AsientoItem {
      // @Column()
      // codigo_contable: string;
 
-     @Column()
-     id_asiento_item: string;
+     // @Column()
+     // id_asiento_item: string;
 
      @Column()
      codigo_centro: string;
@@ -28,10 +28,10 @@ export class AsientoItem {
      @Column()
      cta_nombre: string;
 
-     @Column({ type: 'decimal', precision: 10, scale: 2 })
+     @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
      debe: number;
 
-     @Column({ type: 'decimal', precision: 10, scale: 2 })
+     @Column({ type: 'decimal', precision: 12, scale: 2, default: 0 })
      haber: number;
 
      @Column({ nullable: true })

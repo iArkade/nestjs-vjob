@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsDecimal, IsNumber, IsString } from "class-validator";
+import { IsNumber, IsString } from "class-validator";
 
 export class CreateAsientoItemDto {
      // @ApiProperty({
@@ -22,6 +22,12 @@ export class CreateAsientoItemDto {
      // })
      // @IsString()
      // codigo_contable: string;
+     // @ApiProperty({
+     //      description: 'id de cada fila en la tabla a guardar',
+     //      example: '1',
+     // })
+     // @IsString()
+     // id_asiento_item: string;
 
      @ApiProperty({
           description: 'Código del centro',
@@ -48,14 +54,14 @@ export class CreateAsientoItemDto {
           description: 'Monto en el debe',
           example: 500.00,
      })
-     @IsDecimal()
+     @IsNumber()
      debe: number;
 
      @ApiProperty({
           description: 'Monto en el haber',
           example: 500.00,
      })
-     @IsDecimal()
+     @IsNumber()
      haber: number;
 
      @ApiProperty({

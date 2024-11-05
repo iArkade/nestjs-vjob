@@ -1,6 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { IsArray, IsDate, IsDecimal, IsOptional, IsString, ValidateNested } from "class-validator";
+import { IsArray, IsDate, IsNumber, IsOptional, IsString, ValidateNested } from "class-validator";
 import { CreateAsientoItemDto } from "./create-asiento-item.dto";
 
 export class CreateAsientoDto {
@@ -9,8 +9,8 @@ export class CreateAsientoDto {
           description: 'Fecha de emisión del asiento',
           example: '2023-10-23',
      })
-     @IsDate()
-     fecha_emision: Date;
+     @IsString()
+     fecha_emision: string;
 
      @ApiProperty({
           description: 'Número único del asiento',
@@ -77,14 +77,14 @@ export class CreateAsientoDto {
           description: 'Total del debe',
           example: 1000.00,
      })
-     @IsDecimal()
+     @IsNumber()
      total_debe: number;
 
      @ApiProperty({
           description: 'Total del haber',
           example: 1000.00,
      })
-     @IsDecimal()
+     @IsNumber()
      total_haber: number;
 
      @IsArray()

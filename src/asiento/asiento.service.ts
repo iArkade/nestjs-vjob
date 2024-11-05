@@ -21,7 +21,7 @@ export class AsientoService {
 
   async createAsientoWithItems(createAsientoDto: CreateAsientoDto) {
     const { lineItems, ...asientoData } = createAsientoDto;
-    console.log(createAsientoDto, "Hasta aqui si llega")
+    //console.log(createAsientoDto, "Hasta aqui si llega")
     const asiento = this.asientoRepository.create(asientoData);
     const savedAsiento = await this.asientoRepository.save(asiento);
 
