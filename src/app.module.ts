@@ -6,6 +6,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from './auth/auth.module';
 import { AccountingPlanModule } from './accounting-plan/accounting-plan.module';
 import { dataSourceOptions } from 'db/data-source';
+import { TransaccionContableModule } from './transaccion-contable/transaccion-contable.module';
 
 @Module({
   imports: [
@@ -14,7 +15,9 @@ import { dataSourceOptions } from 'db/data-source';
     }), 
     UsersModule,
     AuthModule,
-    AccountingPlanModule],
+    AccountingPlanModule,
+    TransaccionContableModule
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

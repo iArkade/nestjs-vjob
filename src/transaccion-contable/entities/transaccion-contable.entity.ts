@@ -1,0 +1,31 @@
+import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from "typeorm";
+
+@Entity({ name: 'transaccion-contable' })
+export class TransaccionContable {
+
+    @PrimaryGeneratedColumn()
+    id: number;
+
+    @Column({ unique: true, nullable: true, default: null })
+    codigo_empresa: string;
+
+    @Column({ unique: true, nullable: true, default: null }) 
+    codigo_transaccion: string;
+
+    @Column({ nullable: true, default: null }) 
+    nombre: string;
+
+    @Column({ nullable: true, default: null }) 
+    secuencial: number;
+
+    @Column({ nullable: true, default: 0 }) 
+    lectura: number;
+
+    @Column({ nullable: true, default: 0 }) 
+    activo: boolean;
+
+    @CreateDateColumn({ name: 'created_at' })
+    createdAt: Date;
+
+}
+

@@ -20,28 +20,6 @@ export class AccountingPlanController {
     return await this.accountingPlanService.createMany(createAccountingPlanDto);
   }
 
-  // @Post('upload')
-  // @UseInterceptors(FileInterceptor('file'))
-  // async uploadFile(@UploadedFile() file: Express.Multer.File) {
-  //   if (!file) {
-  //     throw new BadRequestException('No file uploaded');
-  //   }
-
-  //   const workbook = XLSX.read(file.buffer, { type: 'buffer' });
-  //   const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-  //   const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-  //   // Convert the Excel data into DTOs
-  //   const createAccountingPlanDtos = jsonData.map((row) => ({
-  //     code: row[0], // Assuming 'code' is in the first column
-  //     name: row[1], // Assuming 'name' is in the second column
-  //   }));
-
-  //   // Pass the parsed data to the service for bulk creation
-  //   await this.accountingPlanService.createMany(createAccountingPlanDtos);
-
-  //   return { message: 'File uploaded and data imported successfully' };
-  // }
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
@@ -119,8 +97,6 @@ export class AccountingPlanController {
   findAll() {
     return this.accountingPlanService.findAll();
   }
-
-
 
   @Get(':id')
   findOne(@Param('id') id: string) {
