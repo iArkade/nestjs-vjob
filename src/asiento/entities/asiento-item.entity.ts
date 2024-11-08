@@ -38,7 +38,7 @@ export class AsientoItem {
      nota: string;
 
      // Relación con Asiento
-     @ManyToOne(() => Asiento, (asiento) => asiento.items)
+     @ManyToOne(() => Asiento, (asiento) => asiento.lineItems)
      @JoinColumn({ name: 'asiento_id', referencedColumnName: 'id' })
      asiento: Asiento;
 }

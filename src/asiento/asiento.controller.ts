@@ -4,23 +4,27 @@ import { CreateAsientoDto } from './dto/create-asiento.dto';
 import { UpdateAsientoDto } from './dto/update-asiento.dto';
 import { CreateAsientoItemDto } from './dto/create-asiento-item.dto';
 import { ApiTags } from '@nestjs/swagger';
+import { Asiento } from './entities/asiento.entity';
 
 @ApiTags('asientos')
 @Controller('asientos')
 export class AsientoController {
   constructor(private readonly asientoService: AsientoService) {}
 
+  @Get()
+  async findAllWithLineItems(): Promise<Asiento[]> {
+    return await this.asientoService.findAllWithLineItems();
+  }
+
   @Post()
   async createAsiento(@Body() createAsientoDto: CreateAsientoDto) {
     try {
-        // Llama al servicio para crear el Asiento y sus AsientoItem asociados
         const newAsiento = await this.asientoService.createAsientoWithItems(createAsientoDto);
         return {
             message: 'Asiento creado exitosamente',
             data: newAsiento,
         };
     } catch (error) {
-        // Manejo de errores en caso de fallo al crear el Asiento
         throw new HttpException(
             {
                 message: 'Error al crear el asiento',
@@ -31,38 +35,18 @@ export class AsientoController {
     }
   }
 
-  @Get(':id')
-  getAsiento(@Param('id') id: string) {
-    return this.asientoService.findOneWithItems(+id);
-  }
+  // @Get(':id')
+  // async getAsiento(@Param('id') id: string) {
+  //   return this.asientoService.findOneWithItems(+id);
+  // }
 
-  @Post(':id/items')
-  addItemToAsiento(@Param('id') id: number, @Body() createAsientoItemDto: CreateAsientoItemDto) {
-    return this.asientoService.addAsientoItem(id, createAsientoItemDto);
-  }
+  // @Post(':id/items')
+  // addItemToAsiento(@Param('id') id: number, @Body() createAsientoItemDto: CreateAsientoItemDto) {
+  //   return this.asientoService.addAsientoItem(id, createAsientoItemDto);
+  // }
 
-  @Delete('items/:itemId')
-  removeAsientoItem(@Param('itemId') itemId: number) {
-    return this.asientoService.removeAsientoItem(itemId);
-  }
-
-  @Get()
-  findAll() {
-    return this.asientoService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.asientoService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateAsientoDto: UpdateAsientoDto) {
-    return this.asientoService.update(+id, updateAsientoDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.asientoService.remove(+id);
-  }
+  // @Delete('items/:itemId')
+  // removeAsientoItem(@Param('itemId') itemId: number) {
+  //   return this.asientoService.removeAsientoItem(itemId);
+  // }
 }
