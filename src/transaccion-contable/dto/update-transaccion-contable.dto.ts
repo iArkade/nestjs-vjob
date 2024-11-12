@@ -1,5 +1,5 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
-import { IsBoolean, IsNumber, isNumber, IsOptional, IsString, Matches } from 'class-validator';
+import { IsBoolean, IsNumber, isNumber, IsOptional, isString, IsString, Matches } from 'class-validator';
 import { CreateTransaccionContableDto } from './create-transaccion-contable.dto';
 
 export class UpdateTransaccionContablenDto extends PartialType(CreateTransaccionContableDto) {
@@ -25,8 +25,8 @@ export class UpdateTransaccionContablenDto extends PartialType(CreateTransaccion
         example: 'Asiento',
     })
     @IsOptional()
-    @IsNumber()
-    secuencial?: number;  // Optional field
+    @IsString()
+    secuencial?: string;  // Optional field
 
     @ApiProperty({
         description: '1 si es creada por default y 0 es creada manualmente(puede eliminar y editar)',

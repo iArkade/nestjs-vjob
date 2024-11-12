@@ -16,7 +16,7 @@ export class TransaccionContable {
     nombre: string;
 
     @Column({ nullable: true, default: null }) 
-    secuencial: number;
+    secuencial: string;
 
     @Column({ nullable: true, default: 0 }) 
     lectura: number;

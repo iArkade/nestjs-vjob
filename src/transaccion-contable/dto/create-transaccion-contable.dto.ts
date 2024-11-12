@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsBoolean, isBoolean, IsNotEmpty, IsNumber, isNumber, IsOptional, IsString, Matches, MinLength } from "class-validator";
+import { IsBoolean, isBoolean, IsNotEmpty, IsNumber, isNumber, IsOptional, isString, IsString, Matches, MinLength } from "class-validator";
 
 export class CreateTransaccionContableDto {
 
@@ -32,8 +32,8 @@ export class CreateTransaccionContableDto {
         example: '0000001',
     })
     @IsNotEmpty()
-    @IsNumber()
-    secuencial: number;
+    @IsString()
+    secuencial: string;
 
     @ApiProperty({
         description: '1 si es creada por default y 0 es creada manualmente(puede eliminar y editar)',

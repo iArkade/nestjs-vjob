@@ -19,7 +19,7 @@ import { TransaccionContableModule } from './transaccion-contable/transaccion-co
     AuthModule,
     AccountingPlanModule,
     DatCentroModule,
-    AsientoModule],
+    AsientoModule,
     AccountingPlanModule,
     TransaccionContableModule
   ],

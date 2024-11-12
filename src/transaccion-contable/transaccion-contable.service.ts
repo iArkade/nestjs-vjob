@@ -21,8 +21,6 @@ export class TransaccionContableService {
         const { codigo_transaccion } = createTransaccionContableDto;
         const normalizedCode = this.normalizeCode(codigo_transaccion); // Normalizamos el código
 
-
-
         // Verificar si el código ya existe (evitar duplicados como `1.1` y `1.1.`)
         const existingAccount = await this.transactionRepository.findOne({ where: { codigo_transaccion: normalizedCode } });
         if (existingAccount) {
@@ -75,7 +73,6 @@ export class TransaccionContableService {
         return transaction;
     }
 
-    // En el servicio de actualización
     async update(id: number, updateTransaccionContableDto: UpdateTransaccionContablenDto) {
         const transaction = await this.transactionRepository.findOne({ where: { id } });
         if (!transaction) throw new NotFoundException('Transaction not found');
