@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpException, HttpStatus, ParseIntPipe } from '@nestjs/common';
 import { AsientoService } from './asiento.service';
 import { CreateAsientoDto } from './dto/create-asiento.dto';
 import { UpdateAsientoDto } from './dto/update-asiento.dto';
@@ -35,10 +35,10 @@ export class AsientoController {
     }
   }
 
-  // @Get(':id')
-  // async getAsiento(@Param('id') id: string) {
-  //   return this.asientoService.findOneWithItems(+id);
-  // }
+  @Get(':id')
+  async getAsiento(@Param('id', ParseIntPipe) id: number): Promise<Asiento> {
+    return this.asientoService.findOneWithItems(id);
+  }
 
   // @Post(':id/items')
   // addItemToAsiento(@Param('id') id: number, @Body() createAsientoItemDto: CreateAsientoItemDto) {

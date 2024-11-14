@@ -42,12 +42,12 @@ export class AsientoService {
     return savedAsiento;
   }
 
-  // async findOneWithItems(id: number): Promise<Asiento> {
-  //   return this.asientoRepository.findOne({ 
-  //     where: { id },
-  //     relations: ['items']  
-  //   });
-  // }
+  async findOneWithItems(id: number): Promise<Asiento> {
+    return this.asientoRepository.findOne({ 
+      where: { id },
+      relations: ['lineItems']  
+    });
+  }
 
   // async createAsiento(createAsientoDto: CreateAsientoDto): Promise<Asiento> {
   //   const asiento = this.asientoRepository.create(createAsientoDto);
