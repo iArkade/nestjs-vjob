@@ -1,6 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { IsArray, IsDate, IsNumber, IsOptional, IsString, ValidateNested } from "class-validator";
+import { IsArray, IsDate, IsDateString, IsNumber, IsOptional, IsString, ValidateNested } from "class-validator";
 import { CreateAsientoItemDto } from "./create-asiento-item.dto";
 
 export class CreateAsientoDto {
@@ -8,9 +8,12 @@ export class CreateAsientoDto {
      @ApiProperty({
           description: 'Fecha de emisión del asiento',
           example: '2023-10-23',
+          format: 'date'
      })
-     @IsString()
+     @IsDateString()
      fecha_emision: string;
+     // @IsString()
+     // fecha_emision: string;
 
      @ApiProperty({
           description: 'Número único del asiento',

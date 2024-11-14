@@ -25,9 +25,16 @@ export class AsientoService {
   }
 
   async createAsientoWithItems(createAsientoDto: CreateAsientoDto) {
-    const { lineItems, ...asientoData } = createAsientoDto;
-    //console.log(createAsientoDto, "Hasta aqui si llega")
-    const asiento = this.asientoRepository.create(asientoData);
+    const { lineItems, fecha_emision, ...asientoData } = createAsientoDto;
+    
+    // Si `fecha_emision` es nulo o indefinido, asigna la fecha actual
+    const fechaEmisionFinal = fecha_emision || new Date();
+
+    const asiento = this.asientoRepository.create({
+        ...asientoData,
+        fecha_emision: fechaEmisionFinal,
+    });
+    
     const savedAsiento = await this.asientoRepository.save(asiento);
 
     const asientoItems = lineItems.map((item) => {
@@ -40,7 +47,7 @@ export class AsientoService {
     await this.asientoItemRepository.save(asientoItems);
     
     return savedAsiento;
-  }
+}
 
   async findOneWithItems(id: number): Promise<Asiento> {
     return this.asientoRepository.findOne({ 

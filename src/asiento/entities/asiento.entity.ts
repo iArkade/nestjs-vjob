@@ -6,8 +6,10 @@ export class Asiento {
      @PrimaryGeneratedColumn()
      id: number;
 
-     @Column({ nullable: true })
-     fecha_emision: string;
+     // @Column({ nullable: true })
+     // fecha_emision: string;
+     @Column({ type: 'date', nullable: true })
+     fecha_emision: Date;
 
      @Column({ nullable: true })
      nro_asiento: string;
