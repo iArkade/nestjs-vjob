@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from "typeorm";
 
 @Entity({ name: 'dat_centro' })
 export class DatCentro {
@@ -18,9 +18,8 @@ export class DatCentro {
      @Column({nullable: true, default: null }) 
      codigo_empresa: string;
 
-
-     // @CreateDateColumn({ name: 'created_at' })  // Fecha de creación automática
-     // createdAt: Date;
+     @CreateDateColumn({ name: 'created_at' })  // Fecha de creación automática
+     createdAt: Date;
      // @UpdateDateColumn({ name: 'updated_at' })  // Fecha de actualización automática
      // updatedAt: Date;
 }
