@@ -21,6 +21,9 @@ export class AsientoService {
   async findAllWithLineItems(): Promise<Asiento[]> {
     return await this.asientoRepository.find({
       relations: ['lineItems'],
+      order: {
+        id: 'DESC',
+      }
     });
   }
 
