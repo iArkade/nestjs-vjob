@@ -4,12 +4,15 @@ import { UpdateDatCentroDto } from './dto/update-dat_centro.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DatCentro } from './entities/dat_centro.entity';
 import { Not, Repository } from 'typeorm';
+import { Asiento } from 'src/asiento/entities/asiento.entity';
 
 @Injectable()
 export class DatCentroService {
   constructor(
     @InjectRepository(DatCentro)
     private datCentroRepository: Repository<DatCentro>,
+    @InjectRepository(Asiento)
+    private asientoRepository: Repository<Asiento>,
   ) { }
 
   private normalizeCode(code: string): string {
@@ -99,12 +102,24 @@ export class DatCentroService {
 
   async remove(codigo: string) {
 
-    let costCenter = await this.datCentroRepository.findOne({ where: { codigo } });
+    // Verificar si el centro existe en la tabla datCentro
+    const costCenter = await this.datCentroRepository.findOne({ where: { codigo } });
+    if (!costCenter) {
+      throw new BadRequestException('El centro no existe.');
+    }
+
+    // Verificar si el código está relacionado en la tabla asiento
+    const relatedAsiento = await this.asientoRepository.findOne({ where: { codigo_centro: codigo } });
+    if (relatedAsiento) {
+      throw new BadRequestException('No se puede eliminar el centro porque está relacionado con un asiento.');
+    }
+
     try {
+      // Eliminar el centro
       await this.datCentroRepository.remove(costCenter);
-      return { message: 'Transaccion eliminada exitosamente', codigo_transaccion: costCenter.codigo };
+      return { message: 'Transacción eliminada exitosamente', codigo_transaccion: costCenter.codigo };
     } catch (error) {
-      throw new BadRequestException('Error al eliminar la transaccion. Por favor, inténtelo de nuevo.');
+      throw new BadRequestException('Error al eliminar la transacción. Por favor, inténtelo de nuevo.');
     }
 
   }

@@ -18,7 +18,7 @@ export class Asiento {
      comentario: string;
 
      @Column()
-     tipo_transaccion: string;
+     codigo_transaccion: string;
 
      @Column()
      estado: string;

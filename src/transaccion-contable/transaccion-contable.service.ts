@@ -4,12 +4,15 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { TransaccionContable } from './entities/transaccion-contable.entity';
 import { Like, Not, Raw, Repository } from 'typeorm';
 import { UpdateTransaccionContablenDto } from './dto/update-transaccion-contable.dto';
+import { Asiento } from 'src/asiento/entities/asiento.entity';
 
 @Injectable()
 export class TransaccionContableService {
     constructor(
         @InjectRepository(TransaccionContable)
         private transactionRepository: Repository<TransaccionContable>,
+        @InjectRepository(Asiento)
+        private asientoRepository: Repository<Asiento>,
     ) { }
 
     private normalizeCode(code: string): string {
@@ -109,6 +112,16 @@ export class TransaccionContableService {
     async remove(codigo_transaccion: string) {
 
         let transaction = await this.transactionRepository.findOne({ where: { codigo_transaccion } });
+        if (!transaction) {
+            throw new BadRequestException('La transaccion no existe.');
+        }
+
+        const relatedAsiento = await this.asientoRepository.findOne({ where: { codigo_transaccion: codigo_transaccion } });
+        if (relatedAsiento) {
+            throw new BadRequestException('No se puede eliminar la transaccion porque está relacionado con un asiento.');
+        }
+
+        
         try {
             await this.transactionRepository.remove(transaction);
             return { message: 'Transaccion eliminada exitosamente', codigo_transaccion: transaction.codigo_transaccion };

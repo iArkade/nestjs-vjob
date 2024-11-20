@@ -36,7 +36,7 @@ export class CreateAsientoDto {
           example: 'Compra',
      })
      @IsString()
-     tipo_transaccion: string;
+     codigo_transaccion: string;
 
      @ApiProperty({
           description: 'Estado del asiento',
