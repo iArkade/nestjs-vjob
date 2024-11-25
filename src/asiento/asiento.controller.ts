@@ -1,10 +1,10 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpException, HttpStatus, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpException, HttpStatus, ParseIntPipe, Put } from '@nestjs/common';
 import { AsientoService } from './asiento.service';
 import { CreateAsientoDto } from './dto/create-asiento.dto';
-import { UpdateAsientoDto } from './dto/update-asiento.dto';
-import { CreateAsientoItemDto } from './dto/create-asiento-item.dto';
-import { ApiTags } from '@nestjs/swagger';
+import { UpdateAsientoDto } from './dto/update-asiento.dto';import { CreateAsientoItemDto } from './dto/create-asiento-item.dto';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Asiento } from './entities/asiento.entity';
+
 
 @ApiTags('asientos')
 @Controller('asientos')
@@ -40,13 +40,33 @@ export class AsientoController {
     return this.asientoService.findOneWithItems(id);
   }
 
-  // @Post(':id/items')
-  // addItemToAsiento(@Param('id') id: number, @Body() createAsientoItemDto: CreateAsientoItemDto) {
-  //   return this.asientoService.addAsientoItem(id, createAsientoItemDto);
-  // }
-
-  // @Delete('items/:itemId')
-  // removeAsientoItem(@Param('itemId') itemId: number) {
-  //   return this.asientoService.removeAsientoItem(itemId);
+  @Put(':id')
+  @ApiOperation({ summary: 'Actualizar un asiento y sus items' })
+  async updateAsiento(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateAsientoDto: UpdateAsientoDto,
+  ) {
+    try {
+      const updatedAsiento = await this.asientoService.updateAsiento(id, updateAsientoDto);
+      return {
+        message: 'Asiento actualizado exitosamente',
+        data: updatedAsiento,
+      };
+    } catch (error) {
+      throw new HttpException(
+        {
+          message: 'Error al actualizar el asiento',
+          error: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+  
+  // @Delete(':id')
+  // @HttpCode(HttpStatus.NO_CONTENT)
+  // @ApiOperation({ summary: 'Eliminar un asiento y sus items' })
+  // async deleteAsiento(@Param('id', ParseIntPipe) id: number) {
+  //   await this.asientosService.delete(id);
   // }
 }

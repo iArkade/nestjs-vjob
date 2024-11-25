@@ -19,8 +19,6 @@ export class CreateAsientoDto {
   })
   @IsDateString()
   fecha_emision: string;
-  // @IsString()
-  // fecha_emision: string;
 
   @ApiProperty({
     description: 'Número único del asiento',
@@ -102,3 +100,4 @@ export class CreateAsientoDto {
   @Type(() => CreateAsientoItemDto)
   lineItems: CreateAsientoItemDto[];
 }
+

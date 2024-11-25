@@ -1,11 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateAsientoDto } from './dto/create-asiento.dto';
-import { UpdateAsientoDto } from './dto/update-asiento.dto';
+// import { UpdateAsientoDto } from './dto/update-asiento.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Asiento } from './entities/asiento.entity';
 import { AsientoItem } from './entities/asiento-item.entity';
 import { Repository } from 'typeorm';
 import { CreateAsientoItemDto } from './dto/create-asiento-item.dto';
+import { UpdateAsientoDto } from './dto/update-asiento.dto';
 
 @Injectable()
 export class AsientoService {
@@ -13,10 +14,10 @@ export class AsientoService {
   constructor(
     @InjectRepository(Asiento)
     private asientoRepository: Repository<Asiento>,
-    
+
     @InjectRepository(AsientoItem)
     private asientoItemRepository: Repository<AsientoItem>,
-  ) {}
+  ) { }
 
   async findAllWithLineItems(): Promise<Asiento[]> {
     return await this.asientoRepository.find({
@@ -29,56 +30,84 @@ export class AsientoService {
 
   async createAsientoWithItems(createAsientoDto: CreateAsientoDto) {
     const { lineItems, fecha_emision, ...asientoData } = createAsientoDto;
-    
+
     // Si `fecha_emision` es nulo o indefinido, asigna la fecha actual
     const fechaEmisionFinal = fecha_emision || new Date();
 
     const asiento = this.asientoRepository.create({
-        ...asientoData,
-        fecha_emision: fechaEmisionFinal,
+      ...asientoData,
+      fecha_emision: fechaEmisionFinal,
     });
-    
+
     const savedAsiento = await this.asientoRepository.save(asiento);
 
     const asientoItems = lineItems.map((item) => {
-        return this.asientoItemRepository.create({
-            ...item,
-            asiento: savedAsiento,
-        });
+      return this.asientoItemRepository.create({
+        ...item,
+        asiento: savedAsiento,
+      });
     });
 
     await this.asientoItemRepository.save(asientoItems);
-    
+
     return savedAsiento;
-}
+  }
 
   async findOneWithItems(id: number): Promise<Asiento> {
-    return this.asientoRepository.findOne({ 
+    return this.asientoRepository.findOne({
       where: { id },
-      relations: ['lineItems']  
+      relations: ['lineItems']
     });
   }
 
-  // async createAsiento(createAsientoDto: CreateAsientoDto): Promise<Asiento> {
-  //   const asiento = this.asientoRepository.create(createAsientoDto);
-  //   return this.asientoRepository.save(asiento);
-  // }
+  async updateAsiento(id: number, updateAsientoDto: UpdateAsientoDto): Promise<Asiento> {
+    const asiento = await this.asientoRepository.findOne({
+      where: { id },
+      relations: ['lineItems'],
+    });
 
-  // async addAsientoItem(asientoId: number, createAsientoItemDto: CreateAsientoItemDto): Promise<AsientoItem> {
-    
-  //   const asiento = await this.asientoRepository.findOne({
-  //     where: { id: asientoId },
-  //   });
+    if (!asiento) {
+      throw new NotFoundException('Asiento no encontrado');
+    }
 
-  //   if (!asiento) {
-  //     throw new Error('Asiento not found');
-  //   }
-    
-  //   const item = this.asientoItemRepository.create({ ...createAsientoItemDto, asiento });
-  //   return this.asientoItemRepository.save(item);
-  // }
+    // Actualizar campos del asiento principal
+    const updatedAsiento = {
+      ...asiento,
+      ...updateAsientoDto,
+      lineItems: undefined,
+    };
 
-  // async removeAsientoItem(itemId: number): Promise<void> {
-  //   await this.asientoItemRepository.delete(itemId);
-  // }
+    if (updateAsientoDto.lineItems) {
+      const updatedItems = [];
+
+      for (const item of updateAsientoDto.lineItems) {
+        if (item.id) {
+          // Actualizar un ítem existente
+          const existingItem = asiento.lineItems.find((li) => li.id === item.id);
+          if (existingItem) {
+            
+            updatedItems.push({
+              ...existingItem,
+              ...item, // Actualizamos solo las propiedades que llegan en el DTO
+            });
+          } else {
+            throw new NotFoundException(`Item con id ${item.id} no encontrado`);
+          }
+        } else {
+          // Agregar un nuevo ítem
+          const newItem = this.asientoItemRepository.create({
+            ...item,
+            asiento, // Relacionar con el asiento
+          });
+          updatedItems.push(newItem);
+        }
+      }
+
+      // Reemplazar los lineItems del asiento
+      updatedAsiento.lineItems = updatedItems;
+    }
+
+    // Guardar los cambios en la base de datos
+    return await this.asientoRepository.save(asiento);
+  }
 }
