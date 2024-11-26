@@ -14,15 +14,15 @@ export class UsersService {
           private userRepository: Repository<User>,
      ) { }
 
-     async getUsers(): Promise<User[]> {
-          return await this.userRepository.find();
-     }
+     // async getUsers(): Promise<User[]> {
+     //      return await this.userRepository.find();
+     // }
 
-     async getUser(id: number): Promise<User> {
-          return await this.userRepository.findOne({
-               where: { id },
-          });
-     }
+     // async getUser(id: number): Promise<User> {
+     //      return await this.userRepository.findOne({
+     //           where: { id },
+     //      });
+     // }
 
      async findOneByEmail(email: string){
           const result = await this.userRepository.findOneBy({ email });

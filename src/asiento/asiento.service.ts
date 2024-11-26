@@ -65,30 +65,29 @@ export class AsientoService {
       where: { id },
       relations: ['lineItems'],
     });
-
+  
     if (!asiento) {
       throw new NotFoundException('Asiento no encontrado');
     }
-
+  
     // Actualizar campos del asiento principal
-    const updatedAsiento = {
+    let updatedAsiento = {
       ...asiento,
       ...updateAsientoDto,
-      lineItems: undefined,
+      lineItems: asiento.lineItems, // Mantener los lineItems existentes inicialmente
     };
-
+  
     if (updateAsientoDto.lineItems) {
       const updatedItems = [];
-
+  
       for (const item of updateAsientoDto.lineItems) {
         if (item.id) {
           // Actualizar un ítem existente
           const existingItem = asiento.lineItems.find((li) => li.id === item.id);
           if (existingItem) {
-            
             updatedItems.push({
               ...existingItem,
-              ...item, // Actualizamos solo las propiedades que llegan en el DTO
+              ...item, // Actualizar solo las propiedades que llegan en el DTO
             });
           } else {
             throw new NotFoundException(`Item con id ${item.id} no encontrado`);
@@ -102,12 +101,16 @@ export class AsientoService {
           updatedItems.push(newItem);
         }
       }
-
+  
       // Reemplazar los lineItems del asiento
-      updatedAsiento.lineItems = updatedItems;
+      updatedAsiento = {
+        ...updatedAsiento,
+        lineItems: updatedItems,
+      };
     }
-
+  
     // Guardar los cambios en la base de datos
-    return await this.asientoRepository.save(asiento);
+    return await this.asientoRepository.save(updatedAsiento);
   }
+  
 }
