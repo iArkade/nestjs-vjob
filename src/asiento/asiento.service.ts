@@ -70,21 +70,38 @@ export class AsientoService {
       throw new NotFoundException('Asiento no encontrado');
     }
 
-    console.log('Este es el original:' ,asiento)
     // Handle line items
     if (updateAsientoDto.lineItems) {
       // Remove existing line items
       await this.asientoItemRepository.remove(asiento.lineItems);
 
-      // Create new line items with spread operator
-      const newLineItems = updateAsientoDto.lineItems.map(item =>
-        this.asientoItemRepository.create({
-          ...item,
-          asiento
+      //Create new line items
+      const newLineItems = await Promise.all(
+        updateAsientoDto.lineItems.map(async (item) => {
+          if (item.id) {
+            // Existing line item
+            const existingItem = await this.asientoItemRepository.findOne({
+              where: { id: item.id },
+            });  
+            if (existingItem) {
+              return this.asientoItemRepository.save({
+                ...existingItem,
+                ...item,
+                asiento,
+              });
+            } else {
+              throw new NotFoundException(`Item con id ${item.id} no encontrado`);
+            }
+          } else {
+            // New line item
+            return this.asientoItemRepository.create({
+              ...item,
+              asiento,
+            });
+          }
         })
       );
-      console.log('este es el newlineitems:' , newLineItems)
-      await this.asientoItemRepository.save(newLineItems);
+  
       asiento.lineItems = newLineItems;
     }
 
