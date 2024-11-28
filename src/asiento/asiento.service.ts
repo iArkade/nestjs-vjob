@@ -65,52 +65,34 @@ export class AsientoService {
       where: { id },
       relations: ['lineItems'],
     });
-  
+
     if (!asiento) {
       throw new NotFoundException('Asiento no encontrado');
     }
-  
-    // Actualizar campos del asiento principal
-    let updatedAsiento = {
-      ...asiento,
-      ...updateAsientoDto,
-      lineItems: asiento.lineItems, // Mantener los lineItems existentes inicialmente
-    };
-  
+
+    console.log('Este es el original:' ,asiento)
+    // Handle line items
     if (updateAsientoDto.lineItems) {
-      const updatedItems = [];
-  
-      for (const item of updateAsientoDto.lineItems) {
-        if (item.id) {
-          // Actualizar un ítem existente
-          const existingItem = asiento.lineItems.find((li) => li.id === item.id);
-          if (existingItem) {
-            updatedItems.push({
-              ...existingItem,
-              ...item, // Actualizar solo las propiedades que llegan en el DTO
-            });
-          } else {
-            throw new NotFoundException(`Item con id ${item.id} no encontrado`);
-          }
-        } else {
-          // Agregar un nuevo ítem
-          const newItem = this.asientoItemRepository.create({
-            ...item,
-            asiento, // Relacionar con el asiento
-          });
-          updatedItems.push(newItem);
-        }
-      }
-  
-      // Reemplazar los lineItems del asiento
-      updatedAsiento = {
-        ...updatedAsiento,
-        lineItems: updatedItems,
-      };
+      // Remove existing line items
+      await this.asientoItemRepository.remove(asiento.lineItems);
+
+      // Create new line items with spread operator
+      const newLineItems = updateAsientoDto.lineItems.map(item =>
+        this.asientoItemRepository.create({
+          ...item,
+          asiento
+        })
+      );
+      console.log('este es el newlineitems:' , newLineItems)
+      await this.asientoItemRepository.save(newLineItems);
+      asiento.lineItems = newLineItems;
     }
-  
-    // Guardar los cambios en la base de datos
-    return await this.asientoRepository.save(updatedAsiento);
+
+    // Update asiento fields with spread operator
+    return await this.asientoRepository.save({
+      ...asiento,
+      ...updateAsientoDto
+    });
   }
-  
+
 }
