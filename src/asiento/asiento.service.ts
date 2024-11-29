@@ -60,56 +60,55 @@ export class AsientoService {
     });
   }
 
-  async updateAsiento(id: number, updateAsientoDto: UpdateAsientoDto): Promise<Asiento> {
+  async updateAsiento(id: number, updateAsientoDto: UpdateAsientoDto) {
+    const { lineItems, ...asientoData } = updateAsientoDto;
+  
+    // Buscar el asiento existente con sus lineItems
     const asiento = await this.asientoRepository.findOne({
       where: { id },
       relations: ['lineItems'],
     });
-
+  
     if (!asiento) {
       throw new NotFoundException('Asiento no encontrado');
     }
-
-    // Handle line items
-    if (updateAsientoDto.lineItems) {
-      // Remove existing line items
-      await this.asientoItemRepository.remove(asiento.lineItems);
-
-      //Create new line items
-      const newLineItems = await Promise.all(
-        updateAsientoDto.lineItems.map(async (item) => {
-          if (item.id) {
-            // Existing line item
-            const existingItem = await this.asientoItemRepository.findOne({
-              where: { id: item.id },
-            });  
-            if (existingItem) {
-              return this.asientoItemRepository.save({
-                ...existingItem,
-                ...item,
-                asiento,
-              });
-            } else {
-              throw new NotFoundException(`Item con id ${item.id} no encontrado`);
-            }
-          } else {
-            // New line item
-            return this.asientoItemRepository.create({
-              ...item,
-              asiento,
-            });
-          }
-        })
-      );
   
-      asiento.lineItems = newLineItems;
-    }
-
-    // Update asiento fields with spread operator
-    return await this.asientoRepository.save({
+    // Actualizar datos del asiento
+    await this.asientoRepository.save({
       ...asiento,
-      ...updateAsientoDto
+      ...asientoData,
+    });
+  
+    // Separar los lineItems en tres grupos: actualizar, crear y eliminar
+    const itemsToUpdate = lineItems.filter((item) => item.id); // Los que tienen ID
+    const itemsToCreate = lineItems.filter((item) => !item.id); // Los que no tienen ID
+    const newItemIds = itemsToUpdate.map((item) => item.id); // IDs de los enviados
+    const itemsToDelete = asiento.lineItems.filter(
+      (item) => !newItemIds.includes(item.id), // Los que ya no están en la nueva lista
+    );
+  
+    // Guardar los cambios
+    if (itemsToUpdate.length > 0) {
+      await this.asientoItemRepository.save(itemsToUpdate);
+    }
+  
+    if (itemsToCreate.length > 0) {
+      const newItems = itemsToCreate.map((item) =>
+        this.asientoItemRepository.create({ ...item, asiento }),
+      );
+      await this.asientoItemRepository.save(newItems);
+    }
+  
+    if (itemsToDelete.length > 0) {
+      await this.asientoItemRepository.remove(itemsToDelete);
+    }
+  
+    // Retornar el asiento actualizado
+    return this.asientoRepository.findOne({
+      where: { id },
+      relations: ['lineItems'],
     });
   }
+  
 
 }

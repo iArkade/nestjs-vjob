@@ -42,6 +42,9 @@ export class Asiento {
   total_haber: number;
 
   // Relación con AsientoItem
-  @OneToMany(() => AsientoItem, (asientoItem) => asientoItem.asiento)
+  @OneToMany(() => AsientoItem, (asientoItem) => asientoItem.asiento,{
+    cascade: false,
+    eager: false,
+  })
   lineItems: AsientoItem[];
 }
