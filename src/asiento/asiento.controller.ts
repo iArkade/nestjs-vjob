@@ -63,10 +63,22 @@ export class AsientoController {
     }
   }
   
-  // @Delete(':id')
-  // @HttpCode(HttpStatus.NO_CONTENT)
-  // @ApiOperation({ summary: 'Eliminar un asiento y sus items' })
-  // async deleteAsiento(@Param('id', ParseIntPipe) id: number) {
-  //   await this.asientosService.delete(id);
-  // }
+  @Delete(':id')
+  @ApiOperation({ summary: 'Eliminar un asiento y sus items' })
+  async deleteAsiento(@Param('id', ParseIntPipe) id: number) {
+    try {
+      await this.asientoService.deleteAsiento(id);
+      return {
+        message: 'Asiento eliminado exitosamente',
+      };
+    } catch (error) {
+      throw new HttpException(
+        {
+          message: 'Error al eliminar el asiento',
+          error: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
 }

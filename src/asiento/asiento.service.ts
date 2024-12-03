@@ -109,6 +109,23 @@ export class AsientoService {
       relations: ['lineItems'],
     });
   }
-  
 
+  async deleteAsiento(id: number): Promise<void> {
+    const asiento = await this.asientoRepository.findOne({
+      where: { id },
+      relations: ['lineItems'],
+    });
+
+    if (!asiento) {
+      throw new NotFoundException('Asiento no encontrado');
+    }
+
+    if (asiento.lineItems.length > 0) {
+      await this.asientoItemRepository.remove(asiento.lineItems);
+    }
+
+    // Eliminar el asiento
+    await this.asientoRepository.remove(asiento);
+  
+  }
 }
