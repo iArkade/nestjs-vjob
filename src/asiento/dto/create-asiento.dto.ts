@@ -1,19 +1,24 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { Type } from "class-transformer";
-import { IsArray, IsDate, IsDateString, IsNumber, IsOptional, IsString, ValidateNested } from "class-validator";
-import { CreateAsientoItemDto } from "./create-asiento-item.dto";
+import { ApiProperty } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import {
+     IsArray,
+     IsDate,
+     IsDateString,
+     IsNumber,
+     IsOptional,
+     IsString,
+     ValidateNested,
+} from 'class-validator';
+import { CreateAsientoItemDto } from './create-asiento-item.dto';
 
 export class CreateAsientoDto {
-
      @ApiProperty({
           description: 'Fecha de emisión del asiento',
           example: '2023-10-23',
-          format: 'date'
+          format: 'date',
      })
      @IsDateString()
      fecha_emision: string;
-     // @IsString()
-     // fecha_emision: string;
 
      @ApiProperty({
           description: 'Número único del asiento',
@@ -54,12 +59,12 @@ export class CreateAsientoDto {
      @IsOptional()
      nro_referencia?: string;
 
-     @ApiProperty({
-          description: 'Secuencial del asiento',
-          example: '00001',
-     })
-     @IsString()
-     secuencial: string;
+     // @ApiProperty({
+     //      description: 'Secuencial del asiento',
+     //      example: '00001',
+     // })
+     // @IsString()
+     // secuencial: string;
 
      @ApiProperty({
           description: 'Código del centro',
@@ -78,14 +83,14 @@ export class CreateAsientoDto {
 
      @ApiProperty({
           description: 'Total del debe',
-          example: 1000.00,
+          example: 1000.0,
      })
      @IsNumber()
      total_debe: number;
 
      @ApiProperty({
           description: 'Total del haber',
-          example: 1000.00,
+          example: 1000.0,
      })
      @IsNumber()
      total_haber: number;
@@ -94,5 +99,5 @@ export class CreateAsientoDto {
      @ValidateNested({ each: true })
      @Type(() => CreateAsientoItemDto)
      lineItems: CreateAsientoItemDto[];
-
 }
+
