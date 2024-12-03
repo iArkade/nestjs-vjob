@@ -22,7 +22,11 @@ export class AuthService {
                const newUser = await this.userService.createUser({ ...registerDto, password: hashPassword });
 
                const payload = {
-                    userId: newUser.id,
+                    id: newUser.id,
+                    email: newUser.email,
+                    name: newUser.name,
+                    lastname: newUser.lastname,
+                    role: newUser.role,
                };
 
                const token = await this.jwtService.signAsync(payload);
