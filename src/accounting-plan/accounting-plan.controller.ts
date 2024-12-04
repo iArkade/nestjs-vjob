@@ -9,7 +9,7 @@ import * as XLSX from 'xlsx';
 @ApiTags('accounting')
 @Controller('accounting-plan')
 export class AccountingPlanController {
-  constructor(private readonly accountingPlanService: AccountingPlanService) {}
+  constructor(private readonly accountingPlanService: AccountingPlanService) { }
 
   @Post()
   async create(@Body() createAccountingPlanDto: CreateAccountingPlanDto | CreateAccountingPlanDto[]) {
@@ -23,67 +23,77 @@ export class AccountingPlanController {
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file'))
-  async uploadFile(@UploadedFile() file: Express.Multer.File) {
+  async uploadFile(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('replace') replace?: string,
+  ) {
     if (!file) {
       throw new BadRequestException('No file uploaded');
     }
 
     try {
+      // Validar si la tabla ya tiene datos
+      const existingRecordsCount = await this.accountingPlanService.countRecords();
+
+      if (existingRecordsCount > 0 && replace !== 'true') {
+        return {
+          existingData: true,
+          message: 'Datos existentes en la tabla',
+        };
+      }
+
+      if (replace === 'true') {
+        await this.accountingPlanService.deleteAllRecords();
+      }
+
+      // Leer y procesar el archivo Excel
       const workbook = XLSX.read(file.buffer, { type: 'buffer' });
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
       if (jsonData.length < 2) {
-        throw new BadRequestException('The Excel file is empty or contains only headers');
+        throw new BadRequestException(
+          'El archivo Excel está vacío o solo contiene encabezados',
+        );
       }
 
-      // Assume the first row contains headers
       const headers = jsonData[0] as string[];
-      const codeIndex = headers.findIndex(header => header.toLowerCase() === 'code');
-      const nameIndex = headers.findIndex(header => header.toLowerCase() === 'name');
+      const codeIndex = headers.findIndex(
+        (header) => header.toLowerCase() === 'code',
+      );
+      const nameIndex = headers.findIndex(
+        (header) => header.toLowerCase() === 'name',
+      );
 
       if (codeIndex === -1 || nameIndex === -1) {
-        throw new BadRequestException('Invalid Excel structure. Missing "code" or "name" columns.');
+        throw new BadRequestException(
+          'Estructura inválida en el Excel. Faltan las columnas "code" o "name".',
+        );
       }
 
-      // Convert the Excel data into DTOs, starting from the second row
-      const createAccountingPlanDtos: CreateAccountingPlanDto[] = [];
-      for (let i = 1; i < jsonData.length; i++) {
-        const row = jsonData[i] as any[];
-        const dto: CreateAccountingPlanDto = {
-          code: row[codeIndex],
-          name: row[nameIndex],
-        };
+      const records = jsonData.slice(1).map((row) => ({
+        code: row[codeIndex]?.toString()?.trim(),
+        name: row[nameIndex]?.toString()?.trim(),
+      }));
 
-        if (!dto.code || !dto.name) {
-          throw new BadRequestException(`Invalid data in row ${i + 1}. Both code and name are required.`);
-        }
-
-        createAccountingPlanDtos.push(dto);
-      }
-
-      // Process data in batches of 100
-      const batchSize = 100;
-      let processedCount = 0;
-      for (let i = 0; i < createAccountingPlanDtos.length; i += batchSize) {
-        const batch = createAccountingPlanDtos.slice(i, i + batchSize);
-        await this.accountingPlanService.createMany(batch);
-        processedCount += batch.length;
-      }
+      // Validar y guardar los datos
+      const result = await this.accountingPlanService.importData(records);
 
       return {
-        message: 'File uploaded and data imported successfully',
-        recordsProcessed: processedCount,
-        totalRecords: createAccountingPlanDtos.length
+        message: 'Archivo procesado e importado correctamente',
+        ...result,
       };
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      console.error('Error processing Excel file:', error);
-      throw new InternalServerErrorException('An error occurred while processing the file');
+      console.error('Error procesando archivo Excel:', error);
+      throw new InternalServerErrorException(
+        'Ocurrió un error al procesar el archivo',
+      );
     }
   }
+
 
   @Get('paginated')
   findAllPaginated(

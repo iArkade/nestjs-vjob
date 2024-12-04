@@ -12,10 +12,84 @@ export class AccountingPlanService {
     private accountRepository: Repository<AccountingPlan>,
   ) {}
 
-  // Función para normalizar el código eliminando el punto final si existe
+
   private normalizeCode(code: string): string {
     return code.endsWith('.') ? code.slice(0, -1) : code;
   }
+
+  async importData(records: { code: string; name: string }[]) {
+    if (!Array.isArray(records) || records.length === 0) {
+      throw new BadRequestException('No hay datos válidos para procesar.');
+    }
+  
+    const validRecords: CreateAccountingPlanDto[] = [];
+    const errors: string[] = [];
+  
+    const existingAccounts = await this.accountRepository.find({
+      select: ['code'],
+    });
+    const existingCodes = new Set(existingAccounts.map((a) => a.code));
+  
+    // Normalizar los registros para evitar duplicados en la importación
+    const uniqueRecords = new Map<string, { code: string; name: string }>();
+    for (const record of records) {
+      const normalizedCode = record.code.endsWith('.') ? record.code : `${record.code}.`;
+      if (!uniqueRecords.has(normalizedCode)) {
+        uniqueRecords.set(normalizedCode, record);
+      }
+    }
+  
+    // Ordenar los registros por profundidad jerárquica
+    const sortedRecords = Array.from(uniqueRecords.values()).sort(
+      (a, b) => a.code.split('.').length - b.code.split('.').length
+    );
+  
+    for (const [index, record] of sortedRecords.entries()) {
+      const { code, name } = record;
+  
+      if (!code || !name) {
+        errors.push(`Fila ${index + 2}: "code" y "name" son requeridos.`);
+        continue;
+      }
+  
+      // Determinar el código normalizado y su padre
+      const normalizedCode = code.endsWith('.') ? code : `${code}.`;
+      const parentCode = normalizedCode.slice(0, normalizedCode.lastIndexOf('.')) + '.';
+  
+      // Validar si el código ya existe
+      if (existingCodes.has(normalizedCode)) {
+        errors.push(`Fila ${index + 2}: El código "${normalizedCode}" ya existe.`);
+        continue;
+      }
+  
+      // Validar relación padre-hijo solo si no es un código principal
+      if (normalizedCode.includes('.') && normalizedCode !== parentCode && !existingCodes.has(parentCode)) {
+        errors.push(`Fila ${index + 2}: El código padre "${parentCode}" no existe o no termina en un punto.`);
+        continue;
+      }
+  
+      // Agregar a los registros válidos
+      validRecords.push({ code: normalizedCode, name });
+      existingCodes.add(normalizedCode);
+    }
+  
+    // console.log('Registros válidos:', validRecords);
+    // console.log('Errores encontrados:', errors);
+  
+    // Guardar en lotes
+    const batchSize = 100;
+    for (let i = 0; i < validRecords.length; i += batchSize) {
+      const batch = validRecords.slice(i, i + batchSize);
+      await this.accountRepository.save(batch);
+    }
+  
+    return {
+      totalRecords: records.length,
+      validRecords: validRecords.length,
+      errors,
+    };
+  }
+    
 
   async create(createAccountingPlanDto: CreateAccountingPlanDto) {
     const { code } = createAccountingPlanDto;
@@ -59,17 +133,23 @@ export class AccountingPlanService {
   }
 
   async createMany(createAccountingPlanDtos: CreateAccountingPlanDto[]) {
-      if (!Array.isArray(createAccountingPlanDtos)) {
-          throw new TypeError('createAccountingPlanDtos debe ser un array');
+    console.log('Inicio del proceso createMany...');
+    const validDtos = createAccountingPlanDtos.filter(dto => dto.code && dto.name);
+  
+    console.log('Registros válidos:', validDtos);
+  
+    for (const createAccountingPlanDto of validDtos) {
+      try {
+        const result = await this.create(createAccountingPlanDto);
+        console.log('Resultado de guardar registro:', result);
+      } catch (error) {
+        console.error('Error al guardar el registro:', createAccountingPlanDto, error);
       }
-
-      // Filtrar filas vacías o incompletas
-      const validDtos = createAccountingPlanDtos.filter(dto => dto.code && dto.name);
-      for (const createAccountingPlanDto of validDtos) {
-        
-          await this.create(createAccountingPlanDto);
-      }
+    }
+  
+    console.log('Fin del proceso createMany.');
   }
+  
 
 
   async findAllPaginated(page: number, limit: number): Promise<{ data: AccountingPlan[], total: number }> {
@@ -216,5 +296,13 @@ export class AccountingPlanService {
 
     // Filtramos para excluir la cuenta actual
     return subaccounts.some(account => account.code !== code && account.code !== baseCode);
+  }
+
+  async countRecords(): Promise<number> {
+    return this.accountRepository.count();
+  }
+  
+  async deleteAllRecords(): Promise<void> {
+    await this.accountRepository.clear();
   }
 }
