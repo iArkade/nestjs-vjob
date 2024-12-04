@@ -2,32 +2,6 @@ import { ApiProperty } from "@nestjs/swagger";
 import { IsNumber, IsString } from "class-validator";
 
 export class CreateAsientoItemDto {
-     // @ApiProperty({
-     //      description: 'Número del asiento al que pertenece el ítem',
-     //      example: 'AS00123',
-     // })
-     // @IsString()
-     // nro_asiento: string;
-
-     // @ApiProperty({
-     //      description: 'Número de línea del ítem',
-     //      example: 1,
-     // })
-     // @IsNumber()
-     // nro_linea: number;
-
-     // @ApiProperty({
-     //      description: 'Código contable asociado',
-     //      example: 'C001',
-     // })
-     // @IsString()
-     // codigo_contable: string;
-     // @ApiProperty({
-     //      description: 'id de cada fila en la tabla a guardar',
-     //      example: '1',
-     // })
-     // @IsString()
-     // id_asiento_item: string;
 
      @ApiProperty({
           description: 'Código del centro',
