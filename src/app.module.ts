@@ -9,6 +9,7 @@ import { dataSourceOptions } from 'db/data-source';
 import { DatCentroModule } from './dat_centro/dat_centro.module';
 import { AsientoModule } from './asiento/asiento.module';
 import { TransaccionContableModule } from './transaccion-contable/transaccion-contable.module';
+import { EmpresaModule } from './empresa/empresa.module';
 
 @Module({
   imports: [
@@ -21,7 +22,8 @@ import { TransaccionContableModule } from './transaccion-contable/transaccion-co
     DatCentroModule,
     AsientoModule,
     AccountingPlanModule,
-    TransaccionContableModule
+    TransaccionContableModule,
+    EmpresaModule
   ],
   controllers: [AppController],
   providers: [AppService],
