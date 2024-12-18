@@ -1,17 +1,25 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+/* eslint-disable prettier/prettier */
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateAccountingPlanDto } from './dto/create-accounting-plan.dto';
 import { UpdateAccountingPlanDto } from './dto/update-accounting-plan.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { AccountingPlan } from './entities/accounting-plan.entity';
-import { Like, Raw, Repository } from 'typeorm';
+import { Like, Repository } from 'typeorm';
+import { AsientoItem } from 'src/asiento/entities/asiento-item.entity';
 
 @Injectable()
 export class AccountingPlanService {
   constructor(
     @InjectRepository(AccountingPlan)
     private accountRepository: Repository<AccountingPlan>,
-  ) {}
 
+    @InjectRepository(AsientoItem)
+    private asientoItemRepository: Repository<AsientoItem>,
+  ) {}
 
   private normalizeCode(code: string): string {
     return code.endsWith('.') ? code.slice(0, -1) : code;
@@ -21,144 +29,230 @@ export class AccountingPlanService {
     if (!Array.isArray(records) || records.length === 0) {
       throw new BadRequestException('No hay datos válidos para procesar.');
     }
-  
-    const validRecords: CreateAccountingPlanDto[] = [];
+
     const errors: string[] = [];
-  
-    const existingAccounts = await this.accountRepository.find({
-      select: ['code'],
+    const allCodes = new Set<string>();
+
+    // Filtrar y normalizar registros, eliminando entradas inválidas
+    const normalizedRecords = records
+      .map((record, index) => {
+        // Validar que record no sea undefined y tenga propiedades
+        if (!record || typeof record !== 'object') {
+          errors.push(`Fila ${index + 2}: Registro inválido o vacío.`);
+          return null;
+        }
+
+        const code = record.code?.toString().trim() ?? '';
+        const name = record.name?.toString().trim() ?? '';
+
+        // Validar que código y nombre no estén vacíos
+        if (!code || !name) {
+          errors.push(
+            `Fila ${index + 2}: Los campos "code" y "name" son obligatorios.`,
+          );
+          return null;
+        }
+
+        return {
+          originalRecord: record,
+          code,
+          name,
+          normalizedCode: this.normalizeCodeExcel(code),
+          rowNumber: index + 2,
+        };
+      })
+      .filter((record) => record !== null);
+
+    // Verificar duplicados
+    const duplicateCodes = new Set<string>();
+    normalizedRecords.forEach((record) => {
+      if (duplicateCodes.has(record.normalizedCode)) {
+        errors.push(
+          `Fila ${record.rowNumber}: El código "${record.code}" está duplicado.`,
+        );
+      } else {
+        duplicateCodes.add(record.normalizedCode);
+        allCodes.add(record.normalizedCode);
+      }
     });
-    const existingCodes = new Set(existingAccounts.map((a) => a.code));
-  
-    // Normalizar los registros para evitar duplicados en la importación
-    const uniqueRecords = new Map<string, { code: string; name: string }>();
-    for (const record of records) {
-      const normalizedCode = record.code.endsWith('.') ? record.code : `${record.code}.`;
-      if (!uniqueRecords.has(normalizedCode)) {
-        uniqueRecords.set(normalizedCode, record);
+
+    // Validar jerarquía de códigos
+    normalizedRecords.forEach((record) => {
+      // Verificar si el código original termina con punto
+      const endsWithDot = record.code.endsWith('.');
+
+      // Buscar código padre
+      const parentCode = this.findParentCode(record.normalizedCode);
+
+      // Ignorar validación de padre para códigos de primer nivel (1., 2., 3.)
+      if (record.normalizedCode.split('.').length === 1) {
+        return; // Skip parent validation for top-level codes
       }
+
+      // Si termina con punto, debe tener un padre
+      if (endsWithDot && (!parentCode || !allCodes.has(parentCode))) {
+        errors.push(
+          `Fila ${record.rowNumber}: El código "${record.code}" que termina en punto debe tener un código padre válido.`,
+        );
+      }
+
+      // Si no termina con punto, debe tener un padre existente
+      if (!endsWithDot && parentCode && !allCodes.has(parentCode)) {
+        errors.push(
+          `Fila ${record.rowNumber}: El código "${record.code}" no tiene un código padre válido "${parentCode}".`,
+        );
+      }
+    });
+
+    // Si hay errores, no continuar con la importación
+    if (errors.length > 0) {
+      console.log(errors);
+      return {
+        totalRecords: records.length,
+        validRecords: 0,
+        errors,
+      };
     }
-  
-    // Ordenar los registros por profundidad jerárquica
-    const sortedRecords = Array.from(uniqueRecords.values()).sort(
-      (a, b) => a.code.split('.').length - b.code.split('.').length
-    );
-  
-    for (const [index, record] of sortedRecords.entries()) {
-      const { code, name } = record;
-  
-      if (!code || !name) {
-        errors.push(`Fila ${index + 2}: "code" y "name" son requeridos.`);
-        continue;
-      }
-  
-      // Determinar el código normalizado y su padre
-      const normalizedCode = code.endsWith('.') ? code : `${code}.`;
-      const parentCode = normalizedCode.slice(0, normalizedCode.lastIndexOf('.')) + '.';
-  
-      // Validar si el código ya existe
-      if (existingCodes.has(normalizedCode)) {
-        errors.push(`Fila ${index + 2}: El código "${normalizedCode}" ya existe.`);
-        continue;
-      }
-  
-      // Validar relación padre-hijo solo si no es un código principal
-      if (normalizedCode.includes('.') && normalizedCode !== parentCode && !existingCodes.has(parentCode)) {
-        errors.push(`Fila ${index + 2}: El código padre "${parentCode}" no existe o no termina en un punto.`);
-        continue;
-      }
-  
-      // Agregar a los registros válidos
-      validRecords.push({ code: normalizedCode, name });
-      existingCodes.add(normalizedCode);
-    }
-  
-    // console.log('Registros válidos:', validRecords);
-    // console.log('Errores encontrados:', errors);
-  
+
+    // Preparar registros para guardar, manteniendo el código original
+    const validRecords = normalizedRecords.map((record) => ({
+      code: record.code,
+      name: record.name,
+    }));
+
     // Guardar en lotes
     const batchSize = 100;
     for (let i = 0; i < validRecords.length; i += batchSize) {
       const batch = validRecords.slice(i, i + batchSize);
       await this.accountRepository.save(batch);
     }
-  
+
     return {
       totalRecords: records.length,
       validRecords: validRecords.length,
-      errors,
+      errors: [],
     };
   }
-    
+
+  // Método para normalizar códigos (eliminar puntos finales redundantes)
+  private normalizeCodeExcel(code: string): string {
+    // Validar que code sea un string
+    if (typeof code !== 'string') {
+      return '';
+    }
+    // Eliminar puntos finales redundantes
+    return code.replace(/\.+$/, '');
+  }
+
+  // Método para encontrar el código padre
+  private findParentCode(code: string): string | null {
+    // Validar que code sea un string
+    if (typeof code !== 'string') {
+      return null;
+    }
+
+    // Normalizar código antes de buscar padre
+    const normalizedCode = this.normalizeCodeExcel(code);
+
+    // Si no hay punto, no hay padre
+    if (!normalizedCode.includes('.')) return null;
+
+    // Dividir el código por puntos
+    const parts = normalizedCode.split('.');
+
+    // Si solo hay un nivel, no hay padre
+    if (parts.length <= 1) return null;
+
+    // Construir el código padre
+    return parts.slice(0, -1).join('.');
+  }
 
   async create(createAccountingPlanDto: CreateAccountingPlanDto) {
     const { code } = createAccountingPlanDto;
     const normalizedCode = this.normalizeCode(code); // Normalizamos el código
-  
+
     // Verificar si es una cuenta principal (1., 2., 3., etc.)
     const isPrincipalAccount = /^\d+\.$/.test(code);
-  
+
     // Verificar si la tabla está vacía
-    const isTableEmpty = await this.accountRepository.count() === 0;
-  
+    const isTableEmpty = (await this.accountRepository.count()) === 0;
+
     // Permitir la creación de cuentas principales cuando la tabla esté vacía o si el código es principal
     if (isTableEmpty || isPrincipalAccount) {
       if (!code.endsWith('.')) {
-        throw new BadRequestException('El código principal debe terminar con un punto.');
+        throw new BadRequestException(
+          'El código principal debe terminar con un punto.',
+        );
       }
       return await this.accountRepository.save(createAccountingPlanDto);
     }
-  
+
     // Para subcuentas, obtener el código padre (quitar el último segmento del código actual)
-    const parentCode = code.endsWith('.') 
+    const parentCode = code.endsWith('.')
       ? code.slice(0, code.lastIndexOf('.', code.length - 2)) // Quitar último punto
       : code.slice(0, code.lastIndexOf('.')); // Obtener padre
-  
+
     // Buscar el código padre que termina con un punto
-    const parentAccount = await this.accountRepository.findOne({ where: { code: `${parentCode}.` } });
-  
+    const parentAccount = await this.accountRepository.findOne({
+      where: { code: `${parentCode}.` },
+    });
+
     // Verificar que el código padre exista y termine con un punto
     if (!parentAccount) {
-      throw new BadRequestException('El código padre no existe o no termina en un punto.');
+      throw new BadRequestException(
+        'El código padre no existe o no termina en un punto.',
+      );
     }
-  
+
     // Verificar si el código ya existe (evitar duplicados como `1.1` y `1.1.`)
-    const existingAccount = await this.accountRepository.findOne({ where: { code: normalizedCode } });
+    const existingAccount = await this.accountRepository.findOne({
+      where: { code: normalizedCode },
+    });
     if (existingAccount) {
       throw new BadRequestException('El código ya existe.');
     }
-  
+
     // Guardar la cuenta
     return await this.accountRepository.save(createAccountingPlanDto);
   }
 
   async createMany(createAccountingPlanDtos: CreateAccountingPlanDto[]) {
     console.log('Inicio del proceso createMany...');
-    const validDtos = createAccountingPlanDtos.filter(dto => dto.code && dto.name);
-  
+    const validDtos = createAccountingPlanDtos.filter(
+      (dto) => dto.code && dto.name,
+    );
+
     console.log('Registros válidos:', validDtos);
-  
+
     for (const createAccountingPlanDto of validDtos) {
       try {
         const result = await this.create(createAccountingPlanDto);
         console.log('Resultado de guardar registro:', result);
       } catch (error) {
-        console.error('Error al guardar el registro:', createAccountingPlanDto, error);
+        console.error(
+          'Error al guardar el registro:',
+          createAccountingPlanDto,
+          error,
+        );
       }
     }
-  
+
     console.log('Fin del proceso createMany.');
   }
-  
 
-
-  async findAllPaginated(page: number, limit: number): Promise<{ data: AccountingPlan[], total: number }> {
+  async findAllPaginated(
+    page: number,
+    limit: number,
+  ): Promise<{ data: AccountingPlan[]; total: number }> {
     const [result, total] = await this.accountRepository.findAndCount({
       order: { code: 'ASC' },
     });
 
     const sortedResult = this.sortAccountsHierarchically(result);
-    const paginatedResult = sortedResult.slice((page - 1) * limit, page * limit);
+    const paginatedResult = sortedResult.slice(
+      (page - 1) * limit,
+      page * limit,
+    );
 
     return {
       data: paginatedResult,
@@ -171,13 +265,12 @@ export class AccountingPlanService {
     const result = await this.accountRepository.find({
       order: { code: 'ASC' }, // Ordenar por el campo 'code'
     });
-  
+
     // Ordenar jerárquicamente (igual que en el método paginado)
     const sortedResult = this.sortAccountsHierarchically(result);
-  
+
     return sortedResult;
   }
-  
 
   async findOne(id: number) {
     const account = await this.accountRepository.findOne({ where: { id } });
@@ -188,16 +281,18 @@ export class AccountingPlanService {
   async update(id: number, updateAccountingPlanDto: UpdateAccountingPlanDto) {
     const account = await this.accountRepository.findOne({ where: { id } });
     if (!account) throw new NotFoundException('Account not found');
-  
+
     // Check if the account has subaccounts
     const hasSubaccounts = await this.hasSubaccounts(account.code);
-  
+
     if (hasSubaccounts) {
       // If the account has subaccounts, only allow name updates
       if (updateAccountingPlanDto.code) {
-        throw new BadRequestException('No se puede editar el código de una cuenta que tiene subcuentas.');
+        throw new BadRequestException(
+          'No se puede editar el código de una cuenta que tiene subcuentas.',
+        );
       }
-  
+
       if (updateAccountingPlanDto.name) {
         account.name = updateAccountingPlanDto.name;
       }
@@ -205,72 +300,100 @@ export class AccountingPlanService {
       // If the account doesn't have subaccounts, allow both code and name updates
       if (updateAccountingPlanDto.code) {
         const newCode = updateAccountingPlanDto.code.trim();
-  
+
         // Validar jerarquía del código
         const parentCode = newCode.endsWith('.')
           ? newCode.slice(0, newCode.lastIndexOf('.', newCode.length - 2)) // Para códigos con punto, quitar último punto
           : newCode.slice(0, newCode.lastIndexOf('.')); // Para subcuentas sin punto
-  
+
         // Verificar si el padre existe (con punto al final)
-        const parentExists = await this.accountRepository.findOne({ where: { code: `${parentCode}.` } });
+        const parentExists = await this.accountRepository.findOne({
+          where: { code: `${parentCode}.` },
+        });
         if (!parentExists && parentCode) {
-          throw new BadRequestException('El código padre no existe o no termina en un punto.');
+          throw new BadRequestException(
+            'El código padre no existe o no termina en un punto.',
+          );
         }
-  
+
         // Verificar si se está intentando duplicar el código
-        const codeAlreadyExists = await this.accountRepository.findOne({ where: { code: newCode } });
+        const codeAlreadyExists = await this.accountRepository.findOne({
+          where: { code: newCode },
+        });
         if (codeAlreadyExists && codeAlreadyExists.id !== id) {
           throw new BadRequestException('El código ya existe.');
         }
-  
+
         // Actualizar el código sin añadir un punto automáticamente
         account.code = newCode;
       }
-  
+
       if (updateAccountingPlanDto.name) {
         account.name = updateAccountingPlanDto.name;
       }
     }
-  
+
     // Guardar cambios
     return await this.accountRepository.save(account);
   }
-  
-  async remove(code: string) {
 
+  async remove(code: string) {
     // Buscar la cuenta (intentar con y sin punto final)
     let account = await this.accountRepository.findOne({ where: { code } });
-    
+  
     if (!account && !code.endsWith('.')) {
       // Si no se encuentra y no termina en punto, intentar con punto
-      account = await this.accountRepository.findOne({ where: { code: code + '.' } });
+      account = await this.accountRepository.findOne({
+        where: { code: code + '.' },
+      });
     } else if (!account && code.endsWith('.')) {
       // Si no se encuentra y termina en punto, intentar sin punto
-      account = await this.accountRepository.findOne({ where: { code: code.slice(0, -1) } });
+      account = await this.accountRepository.findOne({
+        where: { code: code.slice(0, -1) },
+      });
     }
-
+  
     if (!account) {
-      throw new NotFoundException(`Cuenta no encontrada con el código: ${code}`);
+      throw new NotFoundException(
+        `Cuenta no encontrada con el código: ${code}`,
+      );
     }
-
+  
     // Verificar si tiene subcuentas
     const hasSubaccounts = await this.hasSubaccounts(account.code);
-
+  
     if (hasSubaccounts) {
-      throw new BadRequestException('No se puede eliminar una cuenta que tiene subcuentas.');
+      throw new BadRequestException(
+        'No se puede eliminar una cuenta que tiene subcuentas.',
+      );
     }
-
+  
+    // Verificar si existe un asiento vinculado al código
+    const linkedAsiento = await this.asientoItemRepository.findOne({
+      where: { cta: account.code },
+    });
+  
+    if (linkedAsiento) {
+      throw new BadRequestException(
+        'No se puede eliminar esta cuenta porque tiene un asiento vinculado.',
+      );
+    }
+  
     // Eliminar la cuenta
     try {
       await this.accountRepository.remove(account);
       return { message: 'Cuenta eliminada exitosamente', code: account.code };
     } catch (error) {
-      throw new BadRequestException('Error al eliminar la cuenta. Por favor, inténtelo de nuevo.');
+      throw new BadRequestException(
+        'Error al eliminar la cuenta. Por favor, inténtelo de nuevo.',
+      );
     }
   }
+  
 
-
-  private sortAccountsHierarchically(accounts: AccountingPlan[]): AccountingPlan[] {
+  private sortAccountsHierarchically(
+    accounts: AccountingPlan[],
+  ): AccountingPlan[] {
     return accounts.sort((a, b) => {
       const partsA = a.code.split('.');
       const partsB = b.code.split('.');
@@ -295,13 +418,15 @@ export class AccountingPlanService {
     });
 
     // Filtramos para excluir la cuenta actual
-    return subaccounts.some(account => account.code !== code && account.code !== baseCode);
+    return subaccounts.some(
+      (account) => account.code !== code && account.code !== baseCode,
+    );
   }
 
   async countRecords(): Promise<number> {
     return this.accountRepository.count();
   }
-  
+
   async deleteAllRecords(): Promise<void> {
     await this.accountRepository.clear();
   }
