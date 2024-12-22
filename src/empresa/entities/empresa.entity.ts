@@ -1,34 +1,41 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { AccountingPlan } from "src/accounting-plan/entities/accounting-plan.entity";
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from "typeorm";
 
-@Entity({ name: 'empresa' })
+@Entity({ name: "empresa" })
 export class Empresa {
+  @PrimaryGeneratedColumn()
+  id: number;
 
-     @PrimaryGeneratedColumn()
-     id: number;
+  @Column({ unique: true })
+  codigo: string;
 
-     @Column({ unique: true })
-     codigo: string;
+  @Column({ unique: true })
+  ruc: string;
 
-     @Column({ unique: true })
-     ruc: string;
+  @Column()
+  nombre: string;
 
-     @Column()
-     nombre: string;
+  @Column()
+  correo: string;
 
-     @Column()
-     correo: string;
+  @Column()
+  telefono: string;
 
-     @Column()
-     telefono: string;
+  @Column()
+  direccion: string;
 
-     @Column()
-     direccion: string;
+  @Column({ nullable: true })
+  logo: string;
 
-     @Column({ nullable: true })
-     logo: string;
+  @OneToMany(() => AccountingPlan, (plan) => plan.empresa)
+  accountingPlans: AccountingPlan[];
 
-     @CreateDateColumn({ name: 'created_at' })
-     createdAt: Date;
-
+  @CreateDateColumn({ name: "created_at" })
+  createdAt: Date;
 }
-

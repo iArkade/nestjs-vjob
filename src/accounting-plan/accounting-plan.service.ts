@@ -25,7 +25,9 @@ export class AccountingPlanService {
     return code.endsWith('.') ? code.slice(0, -1) : code;
   }
 
-  async importData(records: { code: string; name: string }[]) {
+  async importData(
+    records: { code: string; name: string; empresa_id: number }[]
+  ) {
     if (!Array.isArray(records) || records.length === 0) {
       throw new BadRequestException('No hay datos válidos para procesar.');
     }
@@ -44,11 +46,12 @@ export class AccountingPlanService {
 
         const code = record.code?.toString().trim() ?? '';
         const name = record.name?.toString().trim() ?? '';
+        const empresaId = record.empresa_id;
 
         // Validar que código y nombre no estén vacíos
-        if (!code || !name) {
+        if (!code || !name || !empresaId) {
           errors.push(
-            `Fila ${index + 2}: Los campos "code" y "name" son obligatorios.`,
+            `Fila ${index + 2}: Los campos "code", "name" y "empresa_id" son obligatorios.`,
           );
           return null;
         }
@@ -57,6 +60,7 @@ export class AccountingPlanService {
           originalRecord: record,
           code,
           name,
+          empresaId,
           normalizedCode: this.normalizeCodeExcel(code),
           rowNumber: index + 2,
         };
@@ -118,6 +122,7 @@ export class AccountingPlanService {
     const validRecords = normalizedRecords.map((record) => ({
       code: record.code,
       name: record.name,
+      empresa_id: record.empresaId,
     }));
 
     // Guardar en lotes
@@ -167,18 +172,22 @@ export class AccountingPlanService {
     return parts.slice(0, -1).join('.');
   }
 
-  async create(createAccountingPlanDto: CreateAccountingPlanDto) {
-    const { code } = createAccountingPlanDto;
-    const normalizedCode = this.normalizeCode(code); // Normalizamos el código
+  async create(createAccountingPlanDto: CreateAccountingPlanDto & { empresa_id: number }) {
+    const { code, empresa_id } = createAccountingPlanDto;
+    const normalizedCode = this.normalizeCode(code);
 
     // Verificar si es una cuenta principal (1., 2., 3., etc.)
     const isPrincipalAccount = /^\d+\.$/.test(code);
 
-    // Verificar si la tabla está vacía
-    const isTableEmpty = (await this.accountRepository.count()) === 0;
+    // Verificar si la tabla está vacía para esta empresa
+    const isTableEmptyForCompany = (
+      await this.accountRepository.count({ 
+        where: { empresa_id } 
+      })
+    ) === 0;
 
     // Permitir la creación de cuentas principales cuando la tabla esté vacía o si el código es principal
-    if (isTableEmpty || isPrincipalAccount) {
+    if (isTableEmptyForCompany || isPrincipalAccount) {
       if (!code.endsWith('.')) {
         throw new BadRequestException(
           'El código principal debe terminar con un punto.',
@@ -187,14 +196,17 @@ export class AccountingPlanService {
       return await this.accountRepository.save(createAccountingPlanDto);
     }
 
-    // Para subcuentas, obtener el código padre (quitar el último segmento del código actual)
+    // Para subcuentas, obtener el código padre
     const parentCode = code.endsWith('.')
-      ? code.slice(0, code.lastIndexOf('.', code.length - 2)) // Quitar último punto
-      : code.slice(0, code.lastIndexOf('.')); // Obtener padre
+      ? code.slice(0, code.lastIndexOf('.', code.length - 2))
+      : code.slice(0, code.lastIndexOf('.'));
 
-    // Buscar el código padre que termina con un punto
+    // Buscar el código padre que termina con un punto para esta empresa
     const parentAccount = await this.accountRepository.findOne({
-      where: { code: `${parentCode}.` },
+      where: { 
+        code: `${parentCode}.`,
+        empresa_id 
+      },
     });
 
     // Verificar que el código padre exista y termine con un punto
@@ -204,22 +216,25 @@ export class AccountingPlanService {
       );
     }
 
-    // Verificar si el código ya existe (evitar duplicados como `1.1` y `1.1.`)
+    // Verificar si el código ya existe para esta empresa
     const existingAccount = await this.accountRepository.findOne({
-      where: { code: normalizedCode },
+      where: { 
+        code: normalizedCode,
+        empresa_id 
+      },
     });
     if (existingAccount) {
-      throw new BadRequestException('El código ya existe.');
+      throw new BadRequestException('El código ya existe para esta empresa.');
     }
 
     // Guardar la cuenta
     return await this.accountRepository.save(createAccountingPlanDto);
   }
 
-  async createMany(createAccountingPlanDtos: CreateAccountingPlanDto[]) {
+  async createMany(createAccountingPlanDtos: (CreateAccountingPlanDto & { empresa_id: number })[]) {
     console.log('Inicio del proceso createMany...');
     const validDtos = createAccountingPlanDtos.filter(
-      (dto) => dto.code && dto.name,
+      (dto) => dto.code && dto.name && dto.empresa_id,
     );
 
     console.log('Registros válidos:', validDtos);
@@ -243,8 +258,10 @@ export class AccountingPlanService {
   async findAllPaginated(
     page: number,
     limit: number,
+    empresaId: number
   ): Promise<{ data: AccountingPlan[]; total: number }> {
     const [result, total] = await this.accountRepository.findAndCount({
+      where: { empresa_id: empresaId },
       order: { code: 'ASC' },
     });
 
@@ -260,30 +277,45 @@ export class AccountingPlanService {
     };
   }
 
-  async findAll(): Promise<AccountingPlan[]> {
-    // Traer todos los registros de la base de datos
+  async findAll(empresaId: number): Promise<AccountingPlan[]> {
+    // Traer todos los registros de la base de datos para esta empresa
     const result = await this.accountRepository.find({
-      order: { code: 'ASC' }, // Ordenar por el campo 'code'
+      where: { empresa_id: empresaId },
+      order: { code: 'ASC' },
     });
 
-    // Ordenar jerárquicamente (igual que en el método paginado)
+    // Ordenar jerárquicamente
     const sortedResult = this.sortAccountsHierarchically(result);
 
     return sortedResult;
   }
 
-  async findOne(id: number) {
-    const account = await this.accountRepository.findOne({ where: { id } });
+  async findOne(id: number, empresaId: number) {
+    const account = await this.accountRepository.findOne({ 
+      where: { 
+        id,
+        empresa_id: empresaId 
+      } 
+    });
     if (!account) throw new NotFoundException('Account not found');
     return account;
   }
 
-  async update(id: number, updateAccountingPlanDto: UpdateAccountingPlanDto) {
-    const account = await this.accountRepository.findOne({ where: { id } });
+  async update(
+    id: number, 
+    updateAccountingPlanDto: UpdateAccountingPlanDto, 
+    empresaId: number
+  ) {
+    const account = await this.accountRepository.findOne({ 
+      where: { 
+        id,
+        empresa_id: empresaId 
+      } 
+    });
     if (!account) throw new NotFoundException('Account not found');
 
     // Check if the account has subaccounts
-    const hasSubaccounts = await this.hasSubaccounts(account.code);
+    const hasSubaccounts = await this.hasSubaccounts(account.code, empresaId);
 
     if (hasSubaccounts) {
       // If the account has subaccounts, only allow name updates
@@ -303,12 +335,15 @@ export class AccountingPlanService {
 
         // Validar jerarquía del código
         const parentCode = newCode.endsWith('.')
-          ? newCode.slice(0, newCode.lastIndexOf('.', newCode.length - 2)) // Para códigos con punto, quitar último punto
-          : newCode.slice(0, newCode.lastIndexOf('.')); // Para subcuentas sin punto
+          ? newCode.slice(0, newCode.lastIndexOf('.', newCode.length - 2))
+          : newCode.slice(0, newCode.lastIndexOf('.'));
 
         // Verificar si el padre existe (con punto al final)
         const parentExists = await this.accountRepository.findOne({
-          where: { code: `${parentCode}.` },
+          where: { 
+            code: `${parentCode}.`,
+            empresa_id: empresaId 
+          },
         });
         if (!parentExists && parentCode) {
           throw new BadRequestException(
@@ -318,7 +353,10 @@ export class AccountingPlanService {
 
         // Verificar si se está intentando duplicar el código
         const codeAlreadyExists = await this.accountRepository.findOne({
-          where: { code: newCode },
+          where: { 
+            code: newCode,
+            empresa_id: empresaId 
+          },
         });
         if (codeAlreadyExists && codeAlreadyExists.id !== id) {
           throw new BadRequestException('El código ya existe.');
@@ -337,19 +375,30 @@ export class AccountingPlanService {
     return await this.accountRepository.save(account);
   }
 
-  async remove(code: string) {
+  async remove(code: string, empresaId: number) {
     // Buscar la cuenta (intentar con y sin punto final)
-    let account = await this.accountRepository.findOne({ where: { code } });
+    let account = await this.accountRepository.findOne({ 
+      where: { 
+        code,
+        empresa_id: empresaId 
+      } 
+    });
   
     if (!account && !code.endsWith('.')) {
       // Si no se encuentra y no termina en punto, intentar con punto
       account = await this.accountRepository.findOne({
-        where: { code: code + '.' },
+        where: { 
+          code: code + '.',
+          empresa_id: empresaId 
+        },
       });
     } else if (!account && code.endsWith('.')) {
       // Si no se encuentra y termina en punto, intentar sin punto
       account = await this.accountRepository.findOne({
-        where: { code: code.slice(0, -1) },
+        where: { 
+          code: code.slice(0, -1),
+          empresa_id: empresaId 
+        },
       });
     }
   
@@ -360,7 +409,7 @@ export class AccountingPlanService {
     }
   
     // Verificar si tiene subcuentas
-    const hasSubaccounts = await this.hasSubaccounts(account.code);
+    const hasSubaccounts = await this.hasSubaccounts(account.code, empresaId);
   
     if (hasSubaccounts) {
       throw new BadRequestException(
@@ -370,7 +419,9 @@ export class AccountingPlanService {
   
     // Verificar si existe un asiento vinculado al código
     const linkedAsiento = await this.asientoItemRepository.findOne({
-      where: { cta: account.code },
+      where: { 
+        cta: account.code,
+      },
     });
   
     if (linkedAsiento) {
@@ -411,10 +462,16 @@ export class AccountingPlanService {
     });
   }
 
-  private async hasSubaccounts(code: string): Promise<boolean> {
+  private async hasSubaccounts(
+    code: string, 
+    empresaId: number
+  ): Promise<boolean> {
     const baseCode = code.endsWith('.') ? code : code + '.';
     const subaccounts = await this.accountRepository.find({
-      where: { code: Like(`${baseCode}%`) },
+      where: { 
+        code: Like(`${baseCode}%`),
+        empresa_id: empresaId 
+      },
     });
 
     // Filtramos para excluir la cuenta actual
@@ -423,11 +480,17 @@ export class AccountingPlanService {
     );
   }
 
-  async countRecords(): Promise<number> {
-    return this.accountRepository.count();
+  async countRecords(empresaId?: number): Promise<number> {
+    return empresaId 
+      ? this.accountRepository.count({ where: { empresa_id: empresaId } })
+      : this.accountRepository.count();
   }
 
-  async deleteAllRecords(): Promise<void> {
-    await this.accountRepository.clear();
+  async deleteAllRecords(empresaId?: number): Promise<void> {
+    if (empresaId) {
+      await this.accountRepository.delete({ empresa_id: empresaId });
+    } else {
+      await this.accountRepository.clear();
+    }
   }
 }

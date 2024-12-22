@@ -11,16 +11,16 @@ import {
   UploadedFile,
   BadRequestException,
   InternalServerErrorException,
-} from "@nestjs/common";
-import { AccountingPlanService } from "./accounting-plan.service";
-import { CreateAccountingPlanDto } from "./dto/create-accounting-plan.dto";
-import { UpdateAccountingPlanDto } from "./dto/update-accounting-plan.dto";
-import { ApiTags } from "@nestjs/swagger";
-import { FileInterceptor } from "@nestjs/platform-express";
-import * as XLSX from "xlsx";
+} from '@nestjs/common';
+import { AccountingPlanService } from './accounting-plan.service';
+import { CreateAccountingPlanDto } from './dto/create-accounting-plan.dto';
+import { UpdateAccountingPlanDto } from './dto/update-accounting-plan.dto';
+import { ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import * as XLSX from 'xlsx';
 
-@ApiTags("accounting")
-@Controller("accounting-plan")
+@ApiTags('accounting')
+@Controller('accounting-plan')
 export class AccountingPlanController {
   constructor(private readonly accountingPlanService: AccountingPlanService) {}
 
@@ -31,49 +31,64 @@ export class AccountingPlanController {
       | CreateAccountingPlanDto
       | CreateAccountingPlanDto[],
   ) {
-    // Si es un solo objeto, lo convertimos en un array
+    // If it's a single object, convert to array
     if (!Array.isArray(createAccountingPlanDto)) {
       createAccountingPlanDto = [createAccountingPlanDto];
     }
-    return await this.accountingPlanService.createMany(createAccountingPlanDto);
+
+    // Add empresa_id to each item
+    const accountingPlansWithCompany = createAccountingPlanDto.map((item) => ({
+      ...item,
+    }));
+
+    return await this.accountingPlanService.createMany(
+      accountingPlansWithCompany,
+    );
   }
 
-  @Post("upload")
-  @UseInterceptors(FileInterceptor("file"))
-  async uploadFile(@UploadedFile() file: Express.Multer.File) {
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadFile(
+    @UploadedFile() file: Express.Multer.File,
+    @Query('empresa_id') empresaId: number,
+  ) {
+    if (!empresaId) {
+      throw new BadRequestException('empresa_id is required');
+    }
+
     if (!file) {
-      throw new BadRequestException("No file uploaded");
+      throw new BadRequestException('No file uploaded');
     }
 
     try {
-      // Validar si la tabla ya tiene datos
+      // Validate if records already exist for this company
       const existingRecordsCount =
-        await this.accountingPlanService.countRecords();
+        await this.accountingPlanService.countRecords(empresaId);
 
       if (existingRecordsCount > 0) {
         throw new BadRequestException({
-          message: "Ya existe un plan de cuentas",
+          message: 'Ya existe un plan de cuentas para esta empresa',
           existingData: true,
         });
       }
 
-      // Leer y procesar el archivo Excel
-      const workbook = XLSX.read(file.buffer, { type: "buffer" });
+      // Read and process Excel file (previous logic remains the same)
+      const workbook = XLSX.read(file.buffer, { type: 'buffer' });
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
       if (jsonData.length < 2) {
         throw new BadRequestException(
-          "El archivo Excel está vacío o solo contiene encabezados",
+          'El archivo Excel está vacío o solo contiene encabezados',
         );
       }
 
       const headers = jsonData[0] as string[];
       const codeIndex = headers.findIndex(
-        (header) => header.toLowerCase() === "code",
+        (header) => header.toLowerCase() === 'code',
       );
       const nameIndex = headers.findIndex(
-        (header) => header.toLowerCase() === "name",
+        (header) => header.toLowerCase() === 'name',
       );
 
       if (codeIndex === -1 || nameIndex === -1) {
@@ -85,64 +100,87 @@ export class AccountingPlanController {
       const records = jsonData.slice(1).map((row) => ({
         code: row[codeIndex]?.toString()?.trim(),
         name: row[nameIndex]?.toString()?.trim(),
+        empresa_id: empresaId,
       }));
 
-      // Validar y guardar los datos
+      // Validate and save the data
       const result = await this.accountingPlanService.importData(records);
 
-      // Si hay errores, lanzar una excepción con los detalles
+      // If there are errors, throw an exception with details
       if (result.errors && result.errors.length > 0) {
         throw new BadRequestException({
-          message: "Errores en la importación",
+          message: 'Errores en la importación',
           errors: result.errors,
         });
       }
 
       return {
-        message: "Archivo procesado e importado correctamente",
+        message: 'Archivo procesado e importado correctamente',
         ...result,
       };
     } catch (error) {
-      // Manejar específicamente los errores
+      // Handle specific errors
       if (error instanceof BadRequestException) {
         throw error;
       }
 
-      console.error("Error procesando archivo Excel:", error);
+      console.error('Error procesando archivo Excel:', error);
       throw new InternalServerErrorException(
-        "Ocurrió un error al procesar el archivo",
+        'Ocurrió un error al procesar el archivo',
       );
     }
   }
 
-  @Get("paginated")
+  @Get('paginated')
   findAllPaginated(
-    @Query("page") page: number = 1,
-    @Query("limit") limit: number = 10,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 10,
+    @Query('empresa_id') empresa_id: number,
   ) {
-    return this.accountingPlanService.findAllPaginated(page, limit);
+    console.log(empresa_id);
+    if (!empresa_id) {
+      throw new BadRequestException('empresa_id is required');
+    }
+    return this.accountingPlanService.findAllPaginated(page, limit, empresa_id);
   }
 
-  @Get("all")
-  findAll() {
-    return this.accountingPlanService.findAll();
+  @Get('all')
+  findAll(@Query('empresa_id') empresa_id: number) {
+    if (!empresa_id) {
+      throw new BadRequestException('empresa_id is required');
+    }
+    return this.accountingPlanService.findAll(empresa_id);
   }
 
-  @Get(":id")
-  findOne(@Param("id") id: string) {
-    return this.accountingPlanService.findOne(+id);
+  @Get(':id')
+  findOne(@Param('id') id: string, @Query('empresa_id') empresa_id: number) {
+    if (!empresa_id) {
+      throw new BadRequestException('empresa_id is required');
+    }
+    return this.accountingPlanService.findOne(+id, empresa_id);
   }
 
-  @Put(":id")
+  @Put(':id')
   update(
-    @Param("id") id: string,
+    @Param('id') id: string,
     @Body() updateAccountingPlanDto: UpdateAccountingPlanDto,
+    @Query('empresa_id') empresa_id: number,
   ) {
-    return this.accountingPlanService.update(+id, updateAccountingPlanDto);
+    if (!empresa_id) {
+      throw new BadRequestException('empresa_id is required');
+    }
+    return this.accountingPlanService.update(
+      +id,
+      updateAccountingPlanDto,
+      empresa_id,
+    );
   }
 
-  @Delete(":code")
-  remove(@Param("code") code: string) {
-    return this.accountingPlanService.remove(code);
+  @Delete(':code')
+  remove(@Param('code') code: string, @Query('empresa_id') empresa_id: number) {
+    if (!empresa_id) {
+      throw new BadRequestException('empresa_id is required');
+    }
+    return this.accountingPlanService.remove(code, empresa_id);
   }
 }
