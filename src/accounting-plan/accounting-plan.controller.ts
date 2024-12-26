@@ -18,6 +18,7 @@ import { UpdateAccountingPlanDto } from './dto/update-accounting-plan.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import * as XLSX from 'xlsx';
+import * as multer from 'multer';
 
 @ApiTags('accounting')
 @Controller('accounting-plan')
@@ -47,12 +48,12 @@ export class AccountingPlanController {
   }
 
   @Post('upload')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', { storage: multer.memoryStorage() }))
   async uploadFile(
     @UploadedFile() file: Express.Multer.File,
-    @Query('empresa_id') empresaId: number,
+    @Query('empresa_id') empresa_id: number,
   ) {
-    if (!empresaId) {
+    if (!empresa_id) {
       throw new BadRequestException('empresa_id is required');
     }
 
@@ -63,7 +64,7 @@ export class AccountingPlanController {
     try {
       // Validate if records already exist for this company
       const existingRecordsCount =
-        await this.accountingPlanService.countRecords(empresaId);
+        await this.accountingPlanService.countRecords(empresa_id);
 
       if (existingRecordsCount > 0) {
         throw new BadRequestException({
@@ -100,7 +101,7 @@ export class AccountingPlanController {
       const records = jsonData.slice(1).map((row) => ({
         code: row[codeIndex]?.toString()?.trim(),
         name: row[nameIndex]?.toString()?.trim(),
-        empresa_id: empresaId,
+        empresa_id: empresa_id,
       }));
 
       // Validate and save the data
@@ -137,7 +138,6 @@ export class AccountingPlanController {
     @Query('limit') limit: number = 10,
     @Query('empresa_id') empresa_id: number,
   ) {
-    console.log(empresa_id);
     if (!empresa_id) {
       throw new BadRequestException('empresa_id is required');
     }
