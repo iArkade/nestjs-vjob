@@ -22,8 +22,8 @@ export class CreateAccountingPlanDto {
   name: string;
 
   @ApiProperty({
-    description: "The name of the company",
-    example: "UDLA",
+    description: "The id of the company",
+    example: "1",
   })
   @IsNumber()
   @IsNotEmpty()

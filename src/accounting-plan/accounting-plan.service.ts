@@ -314,6 +314,19 @@ export class AccountingPlanService {
     });
     if (!account) throw new NotFoundException('Account not found');
 
+    // Verificar si existe un asiento vinculado al código
+    const linkedAsiento = await this.asientoItemRepository.findOne({
+      where: { 
+        cta: account.code,
+      },
+    });
+  
+    if (linkedAsiento) {
+      throw new BadRequestException(
+        'No se puede actualizar esta cuenta porque tiene un asiento vinculado.',
+      );
+    }
+
     // Check if the account has subaccounts
     const hasSubaccounts = await this.hasSubaccounts(account.code, empresaId);
 

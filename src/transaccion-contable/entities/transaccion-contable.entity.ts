@@ -6,8 +6,8 @@ export class TransaccionContable {
     @PrimaryGeneratedColumn()
     id: number;
 
-    @Column({ unique: true, nullable: true, default: null })
-    codigo_empresa: string;
+    @Column({ nullable: false })
+    empresa_id: number;
 
     @Column({ unique: true, nullable: true, default: null }) 
     codigo_transaccion: string;

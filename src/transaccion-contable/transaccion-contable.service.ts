@@ -20,12 +20,12 @@ export class TransaccionContableService {
     }
 
 
-    async create(createTransaccionContableDto: CreateTransaccionContableDto) {
-        const { codigo_transaccion } = createTransaccionContableDto;
+    async create(createTransaccionContableDto: CreateTransaccionContableDto & { empresa_id: number }) {
+        const { codigo_transaccion, empresa_id } = createTransaccionContableDto;
         const normalizedCode = this.normalizeCode(codigo_transaccion); // Normalizamos el código
 
         // Verificar si el código ya existe (evitar duplicados como `1.1` y `1.1.`)
-        const existingAccount = await this.transactionRepository.findOne({ where: { codigo_transaccion: normalizedCode } });
+        const existingAccount = await this.transactionRepository.findOne({ where: { codigo_transaccion: normalizedCode, empresa_id } });
         if (existingAccount) {
             throw new BadRequestException('El código ya existe.');
         }
@@ -34,21 +34,22 @@ export class TransaccionContableService {
         return await this.transactionRepository.save(createTransaccionContableDto);
     }
 
-    async createMany(createTransaccionContableDtos: CreateTransaccionContableDto[]) {
+    async createMany(createTransaccionContableDtos: (CreateTransaccionContableDto & { empresa_id: number })[]) {
         if (!Array.isArray(createTransaccionContableDtos)) {
             throw new TypeError('createTransaccionContableDtos debe ser un array');
         }
 
         // Filtrar filas vacías o incompletas
-        const validDtos = createTransaccionContableDtos.filter(dto => dto.codigo_transaccion && dto.nombre && dto.secuencial);
+        const validDtos = createTransaccionContableDtos.filter(dto => dto.codigo_transaccion && dto.nombre && dto.secuencial && dto.empresa_id);
         for (const createTransaccionContableDto of validDtos) {
 
             await this.create(createTransaccionContableDto);
         }
     }
 
-    async findAllPaginated(page: number, limit: number): Promise<{ data: TransaccionContable[], total: number }> {
+    async findAllPaginated(page: number, limit: number, empresaId: number): Promise<{ data: TransaccionContable[], total: number }> {
         const [result, total] = await this.transactionRepository.findAndCount({
+            where: { empresa_id: empresaId },
             order: { codigo_transaccion: 'ASC' },
         });
 
@@ -60,9 +61,10 @@ export class TransaccionContableService {
         };
     }
 
-    async findAll(): Promise<TransaccionContable[]> {
+    async findAll(empresaId: number): Promise<TransaccionContable[]> {
         // Traer todos los registros de la base de datos
         const result = await this.transactionRepository.find({
+            where: { empresa_id: empresaId },
             order: { codigo_transaccion: 'ASC' }, // Ordenar por el campo 'code'
         });
 
@@ -70,21 +72,26 @@ export class TransaccionContableService {
     }
 
 
-    async findOne(id: number) {
-        const transaction = await this.transactionRepository.findOne({ where: { id } });
+    async findOne(id: number, empresaId: number) {
+        const transaction = await this.transactionRepository.findOne({ where: { id, empresa_id: empresaId } });
         if (!transaction) throw new NotFoundException('Transaction not found');
         return transaction;
     }
 
-    async update(id: number, updateTransaccionContableDto: UpdateTransaccionContablenDto) {
-        const transaction = await this.transactionRepository.findOne({ where: { id } });
+    async update(id: number, updateTransaccionContableDto: UpdateTransaccionContablenDto, empresaId: number) {
+        const transaction = await this.transactionRepository.findOne({ where: { id, empresa_id: empresaId } });
         if (!transaction) throw new NotFoundException('Transaction not found');
+
+        const relatedAsiento = await this.asientoRepository.findOne({ where: { codigo_transaccion: transaction.codigo_transaccion, empresa_id: empresaId } });
+        if (relatedAsiento) {
+            throw new BadRequestException('No se puede actualizar la transaccion porque está relacionado con un asiento.');
+        }
 
         // Verificar si se está intentando duplicar el código
         if (updateTransaccionContableDto.codigo_transaccion) {
             const newCode = updateTransaccionContableDto.codigo_transaccion.trim();
             const codeAlreadyExists = await this.transactionRepository.findOne({
-                where: { codigo_transaccion: newCode, id: Not(id) }
+                where: { codigo_transaccion: newCode, empresa_id: empresaId, id: Not(id) }
             });
             if (codeAlreadyExists) {
                 throw new BadRequestException('El código ya existe.');
@@ -109,14 +116,14 @@ export class TransaccionContableService {
         return await this.transactionRepository.save(transaction);
     }
 
-    async remove(codigo_transaccion: string) {
+    async remove(codigo_transaccion: string, empresaId: number) {
 
-        let transaction = await this.transactionRepository.findOne({ where: { codigo_transaccion } });
+        let transaction = await this.transactionRepository.findOne({ where: { codigo_transaccion, empresa_id: empresaId } });
         if (!transaction) {
             throw new BadRequestException('La transaccion no existe.');
         }
 
-        const relatedAsiento = await this.asientoRepository.findOne({ where: { codigo_transaccion: codigo_transaccion } });
+        const relatedAsiento = await this.asientoRepository.findOne({ where: { codigo_transaccion: codigo_transaccion, empresa_id: empresaId } });
         if (relatedAsiento) {
             throw new BadRequestException('No se puede eliminar la transaccion porque está relacionado con un asiento.');
         }

@@ -4,12 +4,11 @@ import { IsBoolean, isBoolean, IsNotEmpty, IsNumber, isNumber, IsOptional, isStr
 export class CreateTransaccionContableDto {
 
     @ApiProperty({
-        description: 'El codigo de la empresa',
+        description: 'El id de la empresa',
         example: '1',
     })
     @IsString()
-    @IsOptional()
-    codigo_empresa?: string;
+    empresa_id: number;
 
     @ApiProperty({
         description: 'El codigo de la transaccion',

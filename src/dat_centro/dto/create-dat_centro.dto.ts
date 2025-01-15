@@ -3,22 +3,19 @@ import { IsBoolean, IsNotEmpty, IsOptional, IsString, Matches } from "class-vali
 
 export class CreateDatCentroDto {
      @ApiProperty({
-          description: 'Código único de la compañía',
-          example: 'COMP123',
-          nullable: true,
+          description: 'El id de la empresa',
+          example: '1',
      })
      @IsString()
-     @IsOptional()
-     codigo_empresa?: string;
+     empresa_id: number;
 
      @ApiProperty({
-          description: 'Código único del centro',
+          description: 'Código único del centro', 
           example: 'CENT456',
           nullable: true,
      })
      @IsString()
-     @IsOptional()
-     codigo?: string;
+     codigo: string;
      
      @ApiProperty({
      description: 'Nombre del centro',
@@ -26,15 +23,12 @@ export class CreateDatCentroDto {
      nullable: true,
      })
      @IsString()
-     @IsOptional()
-     nombre?: string;
+     nombre: string;
      
      @ApiProperty({
      description: 'Estado activo del centro',
-     example: true,
-     default: true,
+     example: 'true',
      })
      @IsBoolean()
-     @IsOptional()
-     activo?: boolean;
+     activo: boolean;
 }

@@ -8,6 +8,9 @@ export class AsientoItem {
      id: number;
 
      // @Column()
+     // empresa_id: number;
+
+     // @Column()
      // nro_asiento: string;
 
      // @Column()

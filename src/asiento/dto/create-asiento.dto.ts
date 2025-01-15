@@ -12,6 +12,14 @@ import {
 import { CreateAsientoItemDto } from './create-asiento-item.dto';
 
 export class CreateAsientoDto {
+
+     @ApiProperty({
+          description: 'id de la empresa',
+          example: '1',
+     })
+     @IsNumber()
+     empresa_id: number;
+
      @ApiProperty({
           description: 'Fecha de emisión del asiento',
           example: '2023-10-23',
@@ -72,14 +80,6 @@ export class CreateAsientoDto {
      })
      @IsString()
      codigo_centro: string;
-
-     @ApiProperty({
-          description: 'Código de la empresa',
-          example: 'EMP001',
-     })
-     @IsString()
-     @IsOptional()
-     codigo_empresa: string;
 
      @ApiProperty({
           description: 'Total del debe',

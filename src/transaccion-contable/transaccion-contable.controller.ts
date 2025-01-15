@@ -15,35 +15,60 @@ export class TransaccionContableController {
         if (!Array.isArray(createTransaccionContableDto)) {
             createTransaccionContableDto = [createTransaccionContableDto];
         }
-        return await this.transaccionContableService.createMany(createTransaccionContableDto);    
+
+        const transaccionesWithCompany = createTransaccionContableDto.map((item) => ({
+            ...item,
+        }));
+
+        return await this.transaccionContableService.createMany(transaccionesWithCompany);    
     }
 
 
     @Get('paginated')
     findAllPaginated(
-        @Query('page') page: number = 1, 
-        @Query('limit') limit: number = 10
+        @Query('page') page: number = 1,  
+        @Query('limit') limit: number = 10,
+        @Query('empresa_id') empresa_id: number,
     ) {
-        return this.transaccionContableService.findAllPaginated(page, limit);
+        if (!empresa_id) {
+            throw new BadRequestException('empresa_id is required');
+        }
+        return this.transaccionContableService.findAllPaginated(page, limit, empresa_id);
     }
 
     @Get('all')
-    findAll() {
-        return this.transaccionContableService.findAll();
+    findAll(@Query('empresa_id') empresa_id: number) {
+        if (!empresa_id) {
+            throw new BadRequestException('empresa_id is required');
+        }
+        return this.transaccionContableService.findAll(empresa_id);
     }
 
     @Get(':id')
-    findOne(@Param('id') id: string) {
-        return this.transaccionContableService.findOne(+id);
+    findOne(@Param('id') id: string, @Query('empresa_id') empresa_id: number) {
+        if (!empresa_id) {
+            throw new BadRequestException('empresa_id is required');
+        }
+        return this.transaccionContableService.findOne(+id, empresa_id);
     }
 
     @Put(':id')
-    update(@Param('id') id: string, @Body() updateAccountingPlanDto: UpdateTransaccionContablenDto) {
-        return this.transaccionContableService.update(+id, updateAccountingPlanDto);
+    update(
+        @Param('id') id: string, 
+        @Body() UpdateTransaccionContablenDto: UpdateTransaccionContablenDto,
+        @Query('empresa_id') empresa_id: number,
+    ) {
+        if (!empresa_id) {
+            throw new BadRequestException('empresa_id is required');
+        }
+        return this.transaccionContableService.update(+id, UpdateTransaccionContablenDto, empresa_id);
     }
 
     @Delete(':code')
-    remove(@Param('code') code: string) {
-        return this.transaccionContableService.remove(code);
+    remove(@Param('code') code: string, @Query('empresa_id') empresa_id: number) {
+        if (!empresa_id) {
+            throw new BadRequestException('empresa_id is required');
+        }
+        return this.transaccionContableService.remove(code, empresa_id);
     }
 }

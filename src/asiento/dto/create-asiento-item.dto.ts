@@ -3,6 +3,13 @@ import { IsNumber, IsString } from "class-validator";
 
 export class CreateAsientoItemDto {
 
+     // @ApiProperty({
+     //      description: 'Código de la empresa',
+     //      example: '1',
+     // })
+     // @IsNumber()
+     // empresa_id: number;
+
      @ApiProperty({
           description: 'Código del centro',
           example: 'CC001',

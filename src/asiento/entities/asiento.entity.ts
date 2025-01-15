@@ -6,6 +6,9 @@ export class Asiento {
   @PrimaryGeneratedColumn()
   id: number;
 
+  @Column({ nullable: false })
+  empresa_id: number;
+
   // @Column({ nullable: true })
   // fecha_emision: string;
   @Column({ type: 'date', nullable: true })
@@ -32,9 +35,6 @@ export class Asiento {
   @Column()
   codigo_centro: string;
 
-  @Column({ nullable: true })
-  codigo_empresa: string;
-
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   total_debe: number;
 
@@ -42,7 +42,7 @@ export class Asiento {
   total_haber: number;
 
   // Relación con AsientoItem
-  @OneToMany(() => AsientoItem, (asientoItem) => asientoItem.asiento,{
+  @OneToMany(() => AsientoItem, (asientoItem) => asientoItem.asiento, {
     cascade: false,
     eager: false,
   })
