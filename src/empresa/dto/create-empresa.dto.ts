@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsNotEmpty, IsOptional, IsString} from "class-validator";
+import { IsEmail, IsNotEmpty, IsOptional, IsString} from "class-validator";
 
 export class CreateEmpresaDto {
 
@@ -32,7 +32,7 @@ export class CreateEmpresaDto {
           example: 'Activo',
      })
      @IsNotEmpty()
-     @IsString()
+     @IsEmail() 
      correo: string;
 
      @ApiProperty({
@@ -52,7 +52,7 @@ export class CreateEmpresaDto {
      direccion: string;
 
      @ApiProperty({
-          description: 'El logo de la empresa',
+          description: 'La URL del logo de la empresa',
           example: 'Activo',
      })
      @IsOptional()
