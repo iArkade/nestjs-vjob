@@ -1,6 +1,8 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, Index } from "typeorm";
 
 @Entity({ name: 'transaccion-contable' })
+@Index(['empresa_id', 'codigo_transaccion'], { unique: true })
+@Index(['empresa_id', 'codigo_transaccion']) 
 export class TransaccionContable {
 
     @PrimaryGeneratedColumn()
@@ -9,7 +11,8 @@ export class TransaccionContable {
     @Column({ nullable: false })
     empresa_id: number;
 
-    @Column({ unique: true, nullable: true, default: null }) 
+    @Index()
+    @Column({ nullable: true, default: null }) 
     codigo_transaccion: string;
 
     @Column({ nullable: true, default: null }) 
