@@ -2,7 +2,6 @@ import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, Index } from 
 
 @Entity({ name: 'transaccion-contable' })
 @Index(['empresa_id', 'codigo_transaccion'], { unique: true })
-@Index(['empresa_id', 'codigo_transaccion']) 
 export class TransaccionContable {
 
     @PrimaryGeneratedColumn()
