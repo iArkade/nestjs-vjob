@@ -1,7 +1,8 @@
-import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, Index, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
 import { AsientoItem } from './asiento-item.entity';
 
 @Entity({ name: 'asiento' })
+@Index(['empresa_id', 'codigo_transaccion'], { unique: true })
 export class Asiento {
   @PrimaryGeneratedColumn()
   id: number;

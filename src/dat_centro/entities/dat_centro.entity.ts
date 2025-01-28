@@ -1,6 +1,7 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from "typeorm";
 
 @Entity({ name: 'dat_centro' })
+@Index(['empresa_id', 'codigo'], { unique: true })
 export class DatCentro {
 
      @PrimaryGeneratedColumn()
@@ -9,7 +10,7 @@ export class DatCentro {
      @Column({ nullable: false })
      empresa_id: number;
 
-     @Column({ unique: true, nullable: true, default: null }) 
+     @Column({ nullable: false, default: null }) 
      codigo: string;
 
      @Column({ nullable: true }) 

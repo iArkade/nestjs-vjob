@@ -4,14 +4,13 @@ import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, Index } from 
 @Index(['empresa_id', 'codigo_transaccion'], { unique: true })
 export class TransaccionContable {
 
-    @PrimaryGeneratedColumn()
+    @PrimaryGeneratedColumn() 
     id: number;
 
     @Column({ nullable: false })
     empresa_id: number;
 
-    @Index()
-    @Column({ nullable: true, default: null }) 
+    @Column({ nullable: false, default: null }) 
     codigo_transaccion: string;
 
     @Column({ nullable: true, default: null }) 

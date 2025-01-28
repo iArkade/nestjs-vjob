@@ -5,10 +5,13 @@ import {
   PrimaryGeneratedColumn,
   ManyToOne,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { Empresa } from 'src/empresa/entities/empresa.entity';
 
 @Entity({ name: 'accounting_plan' })
+@Index(['empresa_id', 'code'], { unique: true })
+
 export class AccountingPlan {
   @PrimaryGeneratedColumn()
   id: number;
@@ -20,7 +23,7 @@ export class AccountingPlan {
   name: string;
 
   @Column({ nullable: false })
-  empresa_id: number; // Renombrado para mayor claridad
+  empresa_id: number;
 
   @ManyToOne(() => Empresa, (empresa) => empresa.accountingPlans, {
     onDelete: 'CASCADE',
