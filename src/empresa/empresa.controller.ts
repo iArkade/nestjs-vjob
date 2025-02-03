@@ -2,37 +2,41 @@ import {
   Controller,
   Get,
   Post,
-  Body,
-  Patch,
-  Param,
-  Delete,
-  Query,
   Put,
+  Delete,
   UseInterceptors,
   UploadedFile,
-  BadRequestException,
-  InternalServerErrorException,
+  UseGuards,
+  Req,
+  Body,
+  Param,
   ParseIntPipe,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { CreateEmpresaDto } from './dto/create-empresa.dto';
 import { UpdateEmpresaDto } from './dto/update-empresa.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { EmpresaService } from './empresa.service';
-import { Empresa } from './entities/empresa.entity';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import * as path from 'path';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Empresa } from './entities/empresa.entity';
 
 @ApiTags('empresa')
 @Controller('empresa')
 export class EmpresaController {
   constructor(private readonly empresaService: EmpresaService) {}
+
   @Get('all')
-  async findAll(): Promise<Empresa[]> {
-    return await this.empresaService.findAll();
+  @UseGuards(JwtAuthGuard) // Protege esta ruta
+  async findAll(@Req() req): Promise<Empresa[]> {
+    const usuarioId = req.user.id; // Obtener el ID del usuario autenticado
+    return await this.empresaService.findAll(usuarioId);
   }
-  //* Tengo que irme al Module para asegurarme de que sirva los archios desde el directorio de carga para que se puedan usar en el front end
+
   @Post()
+  @UseGuards(JwtAuthGuard) // Protege esta ruta
   @UseInterceptors(
     FileInterceptor('logo', {
       storage: diskStorage({
@@ -44,7 +48,6 @@ export class EmpresaController {
             const ext = file.originalname
               ? path.extname(file.originalname)
               : ''; // Manejar si `originalname` no existe
-            console.log(file.originalname);
             cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
           } catch (error) {
             cb(new Error('Error al procesar el archivo'), null);
@@ -61,27 +64,28 @@ export class EmpresaController {
         }
         cb(null, true);
       },
-      // limits: {
-      //     fileSize: 5 * 1024 * 1024, // 5 MB
-      // },
     }),
   )
   async create(
+    @Req() req,
     @Body() createEmpresaDTO: CreateEmpresaDto,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    if (file) {
-      // Generar URL completa del archivo
-      const baseUrl = process.env.BASE_URL;
-      createEmpresaDTO.logo = `${baseUrl}/uploads/logos/${file.filename}`;
-      console.log(createEmpresaDTO.logo);
-      //createEmpresaDTO.logo = `/uploads/logos/${file.filename}`;
+    const usuarioId = req.user.id; // Obtener el ID del usuario autenticado
+    if (!usuarioId) {
+      throw new UnauthorizedException('User ID not found');
     }
 
-    return await this.empresaService.create(createEmpresaDTO);
+    if (file) {
+      const baseUrl = process.env.BASE_URL || 'http://localhost:4000';
+      createEmpresaDTO.logo = `${baseUrl}/uploads/logos/${file.filename}`;
+    }
+    
+    return await this.empresaService.create(createEmpresaDTO, usuarioId);
   }
 
   @Put(':id')
+  @UseGuards(JwtAuthGuard) // Protege esta ruta
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateEmpresaDTO: UpdateEmpresaDto,
@@ -90,6 +94,7 @@ export class EmpresaController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard) // Protege esta ruta
   async delete(@Param('id', ParseIntPipe) id: number): Promise<void> {
     return await this.empresaService.delete(id);
   }

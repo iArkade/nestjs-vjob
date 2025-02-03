@@ -1,12 +1,9 @@
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { UsuarioEmpresa } from "src/usuario_empresa/entities/usuario_empresa.entity";
+import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 
-export enum Role {
-     USER = 'USER',
-     ADMIN = 'ADMIN',
-}
 
-@Entity({ name: 'users' })
-export class User {
+@Entity({ name: 'usuarios' })
+export class Usuario {
      @PrimaryGeneratedColumn()
      id: number;
 
@@ -19,13 +16,6 @@ export class User {
      @Column({ nullable: true })
      lastname?: string;
 
-     @Column({
-          type: "enum",
-          enum: Role,
-          default: Role.USER // O puedes definir un valor por defecto
-     })
-     role: Role;
-
      @Column()
      password: string;
 
@@ -34,5 +24,11 @@ export class User {
 
      @Column({ nullable: true, length: 2024 })
      tokens?: string;
+
+     @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+     createdAt: Date;
+          
+     @OneToMany(() => UsuarioEmpresa, (usuarioEmpresa) => usuarioEmpresa.usuario)
+     empresas: UsuarioEmpresa[];
 }
 

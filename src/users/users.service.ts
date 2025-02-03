@@ -1,17 +1,26 @@
 import { ConflictException, Injectable, InternalServerErrorException, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { User } from './entities/user.entity';
+import { Usuario } from './entities/user.entity';
 import { Repository } from 'typeorm';
 import { CreateUserRequestDto } from './dtos/create.user.dto';
 import { UpdateUserRequestDto } from './dtos/update.user.dto';
 import * as bcrypt from 'bcrypt';
+import { RegistrarUsuarioDto } from './dtos/register.user.dto';
+import { Empresa } from 'src/empresa/entities/empresa.entity';
+import { UsuarioEmpresa } from 'src/usuario_empresa/entities/usuario_empresa.entity';
 
 
 @Injectable()
 export class UsersService {
      constructor(
-          @InjectRepository(User)
-          private userRepository: Repository<User>,
+          @InjectRepository(Usuario)
+          private userRepository: Repository<Usuario>,
+
+          @InjectRepository(Empresa)
+          private empresaRepository: Repository<Empresa>,
+
+          @InjectRepository(UsuarioEmpresa)
+          private usuarioEmpresaRepository: Repository<UsuarioEmpresa>,
      ) { }
 
      // async getUsers(): Promise<User[]> {
@@ -34,8 +43,40 @@ export class UsersService {
           return result;
      }
 
+     async registrarUser(registrarUsuarioDto: RegistrarUsuarioDto) {
+          const { name, lastname, email, password } = registrarUsuarioDto;
+        
+          // Verificar si el email ya está registrado
+          const usuarioExistente = await this.userRepository.findOne({ where: { email } });
+          if (usuarioExistente) {
+            throw new ConflictException('El email ya está registrado');
+          }
+        
+          // Crear el superadmin
+          const usuario = new Usuario();
+          usuario.name = name;
+          usuario.lastname = lastname;
+          usuario.email = email;
+          usuario.password = await bcrypt.hash(password, 10);
+          const usuarioGuardado = await this.userRepository.save(usuario);
+        
+          // Crear una empresa por defecto para el superadmin
+          const empresa = new Empresa();
+          empresa.nombre = 'Mi Empresa'; // Nombre por defecto
+          await this.empresaRepository.save(empresa);
+        
+          // Asignar el superadmin a la empresa con el rol 'superadmin'
+          const usuarioEmpresa = new UsuarioEmpresa();
+          usuarioEmpresa.usuario = usuarioGuardado;
+          usuarioEmpresa.empresa = empresa;
+          usuarioEmpresa.rol = 'superadmin';
+          await this.usuarioEmpresaRepository.save(usuarioEmpresa);
+        
+          return usuarioGuardado;
+        }
 
-     async createUser(createUserDto: CreateUserRequestDto): Promise<User> {
+
+     async createUser(createUserDto: CreateUserRequestDto): Promise<Usuario> {
           return await this.userRepository.save(createUserDto)
      }
 
@@ -52,7 +93,7 @@ export class UsersService {
           }
      }
 
-     async updateUser(id: number, updateUserDto: UpdateUserRequestDto):  Promise<User> {
+     async updateUser(id: number, updateUserDto: UpdateUserRequestDto):  Promise<Usuario> {
           
           try {
                let user = updateUserDto;
@@ -73,7 +114,7 @@ export class UsersService {
           }
      }
 
-     async updateUserToken(id: number, updateUserDto: UpdateUserRequestDto):  Promise<User> {
+     async updateUserToken(id: number, updateUserDto: UpdateUserRequestDto):  Promise<Usuario> {
           
           try {
                await this.userRepository.update({ id }, updateUserDto);
@@ -84,7 +125,7 @@ export class UsersService {
      }
 
      //opcional en caso de limpiar todos los tokns de todas las sesiones
-     async clearAllTokens(userId: number): Promise<User> {
+     async clearAllTokens(userId: number): Promise<Usuario> {
           await this.userRepository.update({ id: userId }, { tokens: '' });
           return await this.userRepository.findOneBy({ id: userId });
      }

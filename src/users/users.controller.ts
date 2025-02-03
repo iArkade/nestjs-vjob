@@ -3,6 +3,7 @@ import { CreateUserRequestDto } from './dtos/create.user.dto';
 import { UsersService } from './users.service';
 import { UpdateUserRequestDto } from './dtos/update.user.dto';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { RegistrarUsuarioDto } from './dtos/register.user.dto';
 
 @ApiTags('users')
 @Controller('users')
@@ -28,14 +29,10 @@ export class UsersController {
      //      return this.usersService.getUser(id);
      // }
 
-     // @Post()
-     // @ApiOperation({ summary: 'Create a new user' })
-     // @ApiResponse({ status: 201, description: 'User successfully created.' })
-     // @ApiResponse({ status: 400, description: 'Bad Request.' })
-     // @ApiResponse({ status: 409, description: 'Unique constraint violation.' })
-     // createUser( @Body() createUserDto: CreateUserRequestDto ) {
-     //      return  this.usersService.createUser(createUserDto);
-     // }
+     @Post('register')
+     registrarUser( @Body() registrarUsuarioDto: RegistrarUsuarioDto ) {
+          return  this.usersService.registrarUser(registrarUsuarioDto);
+     }
 
      // @Delete(':id')
      // @ApiOperation({ summary: 'Delete a user by ID' })

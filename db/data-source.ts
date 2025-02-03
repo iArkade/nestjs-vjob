@@ -1,9 +1,6 @@
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { config } from 'dotenv';
-import { User } from '../src/users/entities/user.entity';
-import { AccountingPlan } from '../src/accounting-plan/entities/accounting-plan.entity';
-import { DatCentro } from 'src/dat_centro/entities/dat_centro.entity';
 
 config(); // Para cargar el archivo .env
 

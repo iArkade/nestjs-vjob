@@ -1,5 +1,4 @@
 import { IsString, IsNotEmpty, IsBoolean, IsIn, IsOptional, IsEnum, IsEmail, MinLength } from 'class-validator';
-import { Role } from '../entities/user.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 
@@ -33,11 +32,6 @@ export class UpdateUserRequestDto {
      @IsBoolean()
      @IsOptional()
      active?: boolean;  
-
-     @ApiProperty({ example: 'ADMIN', description: 'if the user has privileges or not' })
-     @IsOptional()
-     @IsEnum(Role)
-     role?: Role;
 
      @IsString()
      @IsOptional()   

@@ -10,6 +10,8 @@ import { DatCentroModule } from './dat_centro/dat_centro.module';
 import { AsientoModule } from './asiento/asiento.module';
 import { TransaccionContableModule } from './transaccion-contable/transaccion-contable.module';
 import { EmpresaModule } from './empresa/empresa.module';
+import { UsuarioEmpresa } from './usuario_empresa/entities/usuario_empresa.entity';
+import { Permisos } from './permisos/entities/permisos.entity';
 
 @Module({
   imports: [
@@ -23,7 +25,9 @@ import { EmpresaModule } from './empresa/empresa.module';
     AsientoModule,
     AccountingPlanModule,
     TransaccionContableModule,
-    EmpresaModule
+    EmpresaModule,
+    UsuarioEmpresa,
+    Permisos
   ],
   controllers: [AppController],
   providers: [AppService],

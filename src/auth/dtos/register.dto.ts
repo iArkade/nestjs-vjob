@@ -1,7 +1,7 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 import { IsBoolean, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from "class-validator";
-import { Role } from "src/users/entities/user.entity";
+
 
 export class RegisterDto{
 
@@ -33,12 +33,6 @@ export class RegisterDto{
      @ApiProperty({ example: true, description: 'if the user is active or no' })
      @IsBoolean()
      active: boolean;
-
-     @ApiProperty({ example: 'USER or ADMIN', description: 'The role of the user' })
-     @IsString()
-     @IsEnum(Role)
-     @IsNotEmpty()  
-     role: Role;
 
      @IsString()
      @IsOptional()   

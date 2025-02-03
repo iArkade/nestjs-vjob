@@ -1,5 +1,4 @@
 import { IsString, IsNotEmpty, IsBoolean, IsIn, IsOptional, IsEnum, MinLength, IsEmail } from 'class-validator';
-import { Role } from '../entities/user.entity';
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 
@@ -22,11 +21,6 @@ export class CreateUserRequestDto {
      @MinLength(1)
      @IsNotEmpty()  
      lastname: string;
-
-     @ApiProperty({ example: 'USER or ADMIN', description: 'The role of the user' })
-     @IsEnum(Role)
-     @IsNotEmpty()  
-     role: Role;
 
      @ApiProperty({ example: 'password', description: 'the password of the user' })
      @Transform(({value}) => value.trim())
