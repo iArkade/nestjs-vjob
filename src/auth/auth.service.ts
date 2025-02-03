@@ -44,17 +44,17 @@ export class AuthService {
                usuario.password = await bcrypt.hash(password, 10);
                const usuarioGuardado = await this.userRepository.save(usuario);
 
-               // Crear una empresa por defecto para el superadmin
-               const empresa = new Empresa();
-               empresa.nombre = 'Mi Empresa'; // Nombre por defecto
-               const empresaGuardada = await this.empresaRepository.save(empresa);
+               // // Crear una empresa por defecto para el superadmin
+               // const empresa = new Empresa();
+               // empresa.nombre = 'Mi Empresa'; // Nombre por defecto
+               // const empresaGuardada = await this.empresaRepository.save(empresa);
 
-               // Asignar el superadmin a la empresa con el rol 'superadmin'
-               const usuarioEmpresa = new UsuarioEmpresa();
-               usuarioEmpresa.usuario = usuarioGuardado;
-               usuarioEmpresa.empresa = empresaGuardada;
-               usuarioEmpresa.rol = 'superadmin';
-               await this.usuarioEmpresaRepository.save(usuarioEmpresa);
+               // // Asignar el superadmin a la empresa con el rol 'superadmin'
+               // const usuarioEmpresa = new UsuarioEmpresa();
+               // usuarioEmpresa.usuario = usuarioGuardado;
+               // usuarioEmpresa.empresa = empresaGuardada;
+               // usuarioEmpresa.rol = 'superadmin';
+               // await this.usuarioEmpresaRepository.save(usuarioEmpresa);
 
                // Generar el token JWT
                const payload = {
