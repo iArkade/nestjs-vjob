@@ -28,5 +28,10 @@ export class TransaccionContable {
     @CreateDateColumn({ name: 'created_at' })
     createdAt: Date;
 
+    // @UpdateDateColumn({ 
+    //     name: 'updated_at',
+    //     comment: 'Fecha de última actualización'
+    // })
+    // updatedAt: Date;
 }
 
