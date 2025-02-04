@@ -25,6 +25,9 @@ export class Usuario {
      @Column({ nullable: true, length: 2024 })
      tokens?: string;
 
+     @Column({ default: false })
+     superAdmin: boolean;
+
      @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
      createdAt: Date;
           

@@ -37,8 +37,9 @@ export class AuthService {
                     lastname,
                     email,
                     password: await bcrypt.hash(password, 10),
+                    superAdmin: true
                });
-
+               console.log(usuario)
                const usuarioGuardado = await this.userRepository.save(usuario);
 
                // Generar el token JWT

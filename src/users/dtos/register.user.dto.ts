@@ -36,4 +36,7 @@ export class RegistrarUsuarioDto {
     @IsOptional()
     tokens?: string;
 
+    @IsBoolean()
+    superAdmin: boolean;
+
 }

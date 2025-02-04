@@ -37,4 +37,9 @@ export class RegisterDto{
      @IsString()
      @IsOptional()   
      tokens?: string;
+
+     @IsBoolean()
+     @IsOptional()   
+     superAdmin?: boolean;
+
 }
