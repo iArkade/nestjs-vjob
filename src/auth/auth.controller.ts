@@ -22,11 +22,12 @@ export class AuthController {
      }
 
      @Post('logout')
-     @UseGuards(JwtAuthGuard) // Protege esta ruta
-     async logout(@Body() logoutDto: LogoutDto, @Req() req) {
-          console.log(logoutDto.userId);
+     @UseGuards(JwtAuthGuard)
+     async logout(@Req() req) {
+          const token = req.headers.authorization.split(' ')[1];
+          const userId = req.user.id; 
           
-          const token = req.headers.authorization.split(' ')[1]; // Extrae el token del header
-          return await this.authService.logout(logoutDto.userId, token);
+          return await this.authService.logout(userId, token);
      }
+
 }

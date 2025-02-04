@@ -29,10 +29,10 @@ export class UsersController {
      //      return this.usersService.getUser(id);
      // }
 
-     @Post('register')
-     registrarUser( @Body() registrarUsuarioDto: RegistrarUsuarioDto ) {
-          return  this.usersService.registrarUser(registrarUsuarioDto);
-     }
+     // @Post('register')
+     // registrarUser( @Body() registrarUsuarioDto: RegistrarUsuarioDto ) {
+     //      return  this.usersService.registrarUser(registrarUsuarioDto);
+     // }
 
      // @Delete(':id')
      // @ApiOperation({ summary: 'Delete a user by ID' })
