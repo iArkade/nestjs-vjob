@@ -74,6 +74,7 @@ export class AuthService {
                     email: user.email,
                     name: user.name,
                     lastname: user.lastname,
+                    superAdmin: user.superAdmin
                };
                const token = await this.jwtService.signAsync(payload);
 
@@ -82,7 +83,7 @@ export class AuthService {
                tokensArray.push(token);
                await this.userService.updateUserToken(user.id, { tokens: tokensArray.join(', ') });
 
-               return { id: user.id, email: user.email, name: user.name, lastname: user.lastname, tokens: token };
+               return { id: user.id, email: user.email, name: user.name, lastname: user.lastname, tokens: token, superAdmin: user.superAdmin};
           } catch (error) {
                console.error('Error during login:', error);
                throw new InternalServerErrorException('An error occurred during login');
