@@ -1,5 +1,6 @@
 import { UsuarioEmpresa } from "src/usuario_empresa/entities/usuario_empresa.entity";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import { Role } from "../enums/role.enum";
 
 
 @Entity({ name: 'usuarios' })
@@ -21,6 +22,9 @@ export class Usuario {
 
      @Column({ default: true }) // Puedes definir un valor por defecto si es necesario
      active: boolean;
+
+     @Column({ type: 'enum', enum: Role, default: Role.USER })
+     role: Role;
 
      @Column({ nullable: true, length: 2024 })
      tokens?: string;

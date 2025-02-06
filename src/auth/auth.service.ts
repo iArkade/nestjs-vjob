@@ -1,4 +1,10 @@
-import { BadRequestException, ConflictException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
+import {
+     BadRequestException,
+     ConflictException,
+     Injectable,
+     InternalServerErrorException,
+     UnauthorizedException
+} from '@nestjs/common';
 import { UsersService } from 'src/users/users.service';
 import { RegisterDto } from './dtos/register.dto';
 import * as bcrypt from 'bcrypt';
@@ -7,8 +13,9 @@ import { JwtService } from '@nestjs/jwt';
 import { Usuario } from 'src/users/entities/user.entity';
 import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Empresa } from 'src/empresa/entities/empresa.entity';
 import { UsuarioEmpresa } from 'src/usuario_empresa/entities/usuario_empresa.entity';
+import { Empresa } from 'src/empresa/entities/empresa.entity';
+import { Role } from 'src/users/enums/role.enum';
 
 @Injectable()
 export class AuthService {
@@ -19,11 +26,13 @@ export class AuthService {
           @InjectRepository(Usuario)
           private userRepository: Repository<Usuario>,
 
+          @InjectRepository(UsuarioEmpresa)
+          private usuarioEmpresaRepository: Repository<UsuarioEmpresa>,
      ) { }
 
      async registrarUser(registerDto: RegisterDto) {
           try {
-               const { name, lastname, email, password } = registerDto;
+               const { name, lastname, email, password } = registerDto; 
 
                // Verificar si el email ya está registrado
                const usuarioExistente = await this.userRepository.findOne({ where: { email } });
@@ -31,13 +40,13 @@ export class AuthService {
                     throw new ConflictException('El email ya está registrado');
                }
 
-               // Crear el superadmin
+               // Crear el usuario con el rol asignado
                const usuario = this.userRepository.create({
                     name,
                     lastname,
                     email,
                     password: await bcrypt.hash(password, 10),
-                    superAdmin: true
+                    role: Role.SUPERADMIN, // Se asigna el rol
                });
                console.log(usuario)
                const usuarioGuardado = await this.userRepository.save(usuario);
@@ -48,6 +57,7 @@ export class AuthService {
                     email: usuarioGuardado.email,
                     name: usuarioGuardado.name,
                     lastname: usuarioGuardado.lastname,
+                    role: usuarioGuardado.role, // Incluir el rol en el token
                };
                const token = await this.jwtService.signAsync(payload);
 
@@ -61,6 +71,7 @@ export class AuthService {
           }
      }
 
+
      async login(loginDto: LoginDto) {
           try {
                const { email, password } = loginDto;
@@ -69,12 +80,23 @@ export class AuthService {
                     throw new UnauthorizedException('El email o la password son incorrectos');
                }
 
+               // Buscar empresa del usuario si no es Superadmin
+               let empresaId = null;
+               if (user.role !== 'superadmin') {
+                    const usuarioEmpresa = await this.usuarioEmpresaRepository.findOne({
+                         where: { usuario: { id: user.id } },
+                         relations: ['empresa'],
+                    });
+                    empresaId = usuarioEmpresa ? usuarioEmpresa.empresa.id : null;
+               }
+
                const payload = {
                     id: user.id,
                     email: user.email,
                     name: user.name,
                     lastname: user.lastname,
-                    superAdmin: user.superAdmin
+                    role: user.role,
+                    empresaId: empresaId, // Asigna empresa si aplica
                };
                const token = await this.jwtService.signAsync(payload);
 
@@ -83,7 +105,7 @@ export class AuthService {
                tokensArray.push(token);
                await this.userService.updateUserToken(user.id, { tokens: tokensArray.join(', ') });
 
-               return { id: user.id, email: user.email, name: user.name, lastname: user.lastname, tokens: token, superAdmin: user.superAdmin};
+               return { id: user.id, email: user.email, name: user.name, lastname: user.lastname, role: user.role, empresaId, tokens: token };
           } catch (error) {
                console.error('Error during login:', error);
                throw new InternalServerErrorException('An error occurred during login');
@@ -92,8 +114,7 @@ export class AuthService {
 
      async logout(userId: number, token: string) {
           const user = await this.userService.findOneById(userId);
-          console.log(user);
-          
+
           if (!user || !user.tokens) {
                throw new UnauthorizedException('User not found or already logged out');
           }
