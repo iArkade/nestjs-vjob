@@ -34,11 +34,13 @@ export class Empresa {
   @Column({ nullable: true })
   logo?: string;
 
+  @CreateDateColumn({ name: "created_at" })
+  createdAt: Date;
+
   @OneToMany(() => AccountingPlan, (plan) => plan.empresa)
   accountingPlans: AccountingPlan[];
 
-  @CreateDateColumn({ name: "created_at" })
-  createdAt: Date;
+
 
   @OneToMany(() => UsuarioEmpresa, (usuarioEmpresa) => usuarioEmpresa.empresa)
   usuarios: UsuarioEmpresa[];

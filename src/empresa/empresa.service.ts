@@ -53,7 +53,6 @@ export class EmpresaService {
         const usuarioEmpresa = this.usuarioEmpresaRepository.create({
             usuario: { id: usuarioId },
             empresa: empresaGuardada,
-            rol: 'superadmin'
         });
 
         await this.usuarioEmpresaRepository.save(usuarioEmpresa);

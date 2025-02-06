@@ -2,7 +2,6 @@ import { ApiProperty } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 import { IsBoolean, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from "class-validator";
 
-
 export class RegisterDto{
 
      @ApiProperty({ example: 'john.doe@example.com', description: 'The email of the user' })
@@ -37,4 +36,5 @@ export class RegisterDto{
      @IsString()
      @IsOptional()   
      tokens?: string;
+
 }
