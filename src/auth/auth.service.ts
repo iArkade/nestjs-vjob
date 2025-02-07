@@ -32,7 +32,7 @@ export class AuthService {
 
      async registrarUser(registerDto: RegisterDto) {
           try {
-               const { name, lastname, email, password } = registerDto; 
+               const { name, lastname, email, password } = registerDto;
 
                // Verificar si el email ya está registrado
                const usuarioExistente = await this.userRepository.findOne({ where: { email } });
@@ -66,8 +66,21 @@ export class AuthService {
                     tokens: token,
                };
           } catch (error) {
-               console.error('Error during registration:', error);
-               throw new InternalServerErrorException('An error occurred during registration');
+               // Manejo de errores específicos
+               if (error instanceof ConflictException) {
+                    // Error ya lanzado por el email duplicado
+                    throw error;
+               }
+
+               // Manejo de errores relacionados con la base de datos
+               if (error.name === 'QueryFailedError') {
+                    console.error('Error en la base de datos:', error);
+                    throw new InternalServerErrorException('Error al guardar el usuario en la base de datos.');
+               }
+
+               // Otros errores
+               console.error('Error desconocido durante el registro:', error);
+               throw new InternalServerErrorException('Ocurrió un error inesperado durante el registro.');
           }
      }
 
@@ -77,7 +90,7 @@ export class AuthService {
                const { email, password } = loginDto;
                const user = await this.userService.findOneByEmail(email);
                if (!user || !(await bcrypt.compare(password, user.password))) {
-                    throw new UnauthorizedException('El email o la password son incorrectos');
+                    throw new UnauthorizedException('El email o la contraseña son incorrectos');
                }
 
                // Buscar empresa del usuario si no es Superadmin
@@ -105,10 +118,30 @@ export class AuthService {
                tokensArray.push(token);
                await this.userService.updateUserToken(user.id, { tokens: tokensArray.join(', ') });
 
-               return { id: user.id, email: user.email, name: user.name, lastname: user.lastname, role: user.role, empresaId, tokens: token };
+               return {
+                    id: user.id,
+                    email: user.email,
+                    name: user.name,
+                    lastname: user.lastname,
+                    role: user.role,
+                    empresaId,
+                    tokens: token
+               };
           } catch (error) {
-               console.error('Error during login:', error);
-               throw new InternalServerErrorException('An error occurred during login');
+               if (error instanceof UnauthorizedException) {
+                    // Si el error ya es de autenticación, lo lanzamos tal cual
+                    throw error;
+               }
+
+               // Manejo de errores relacionados con la base de datos
+               if (error.name === 'QueryFailedError') {
+                    console.error('Error en la base de datos:', error);
+                    throw new InternalServerErrorException('Error al consultar la base de datos.');
+               }
+
+               // Otros errores genéricos
+               console.error('Error desconocido durante el inicio de sesión:', error);
+               throw new InternalServerErrorException('Ocurrió un error inesperado durante el inicio de sesión.');
           }
      }
 
