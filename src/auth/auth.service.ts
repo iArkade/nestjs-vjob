@@ -146,15 +146,36 @@ export class AuthService {
      }
 
      async logout(userId: number, token: string) {
-          const user = await this.userService.findOneById(userId);
+          try {
+               const user = await this.userService.findOneById(userId);
 
-          if (!user || !user.tokens) {
-               throw new UnauthorizedException('User not found or already logged out');
+               // Verificar si el usuario existe y tiene tokens
+               if (!user) {
+                    throw new UnauthorizedException('El usuario no existe.');
+               }
+
+               if (!user.tokens) {
+                    throw new UnauthorizedException('El usuario ya ha cerrado sesión.');
+               }
+
+               // Filtrar el token y actualizar
+               let tokensArray = user.tokens.split(', ').filter(storedToken => storedToken !== token);
+
+               await this.userService.updateUserToken(userId, {
+                    tokens: tokensArray.length ? tokensArray.join(', ') : null
+               });
+
+               return { message: 'Cierre de sesión exitoso' };
+
+          } catch (error) {
+               if (error instanceof UnauthorizedException) {
+                    // Relanzar los errores de autenticación
+                    throw error;
+               }
+
+               // Manejo de errores de base de datos u otros errores no previstos
+               console.error('Error inesperado durante el cierre de sesión:', error);
+               throw new InternalServerErrorException('Ocurrió un error inesperado. Intente nuevamente más tarde.');
           }
-
-          let tokensArray = user.tokens.split(', ').filter(storedToken => storedToken !== token);
-          await this.userService.updateUserToken(userId, { tokens: tokensArray.length ? tokensArray.join(', ') : null });
-
-          return { message: 'Logout successful' };
      }
 }
