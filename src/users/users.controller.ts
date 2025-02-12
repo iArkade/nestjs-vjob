@@ -1,59 +1,81 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, ValidationPipe } from '@nestjs/common';
-import { CreateUserRequestDto } from './dtos/create.user.dto';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Req, Request, UseGuards, ValidationPipe } from '@nestjs/common';
+import { AssignCompanyDto, CreateUserDto } from './dtos/create.user.dto';
 import { UsersService } from './users.service';
-import { UpdateUserRequestDto } from './dtos/update.user.dto';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { RegistrarUsuarioDto } from './dtos/register.user.dto';
+import { UpdateUserDto } from './dtos/update.user.dto';
+import { ApiTags } from '@nestjs/swagger';
+import { RoleGuard } from 'src/auth/guards/role.guard';
+import { Roles } from 'src/decorators/roles.decorator';
+import { SystemRole } from './enums/role.enum';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
-@ApiTags('users')
-@Controller('users')
+@ApiTags('usuario')
+@Controller('usuario')
 export class UsersController {
      constructor(
           private usersService: UsersService
      ) { }
 
-     // @Get()
-     // @ApiOperation({ summary: 'Get all users' })
-     // @ApiResponse({ status: 200, description: 'User list successfully returned.' })
-     // @ApiResponse({ status: 404, description: 'No users were found.' })
-     // getUsers() {
-     //      return this.usersService.getUsers();
-     // }
+     @Post()
+     @UseGuards(JwtAuthGuard, RoleGuard)
+     @Roles(SystemRole.SUPERADMIN)
+     async create(@Request() req, @Body() createUserDto: CreateUserDto) {
+          return await this.usersService.create(createUserDto, req.user);
+     }
 
-     // @Get(':id')
-     // @ApiOperation({ summary: 'Get a user by ID' })
-     // @ApiParam({ name: 'id', type: 'number', description: 'User ID' })
-     // @ApiResponse({ status: 200, description: 'User successfully returned.' })
-     // @ApiResponse({ status: 404, description: 'User not found.' })
-     // getUser(@Param('id', ParseIntPipe) id: number) {
-     //      return this.usersService.getUser(id);
-     // }
+     @Get()
+     @UseGuards(JwtAuthGuard, RoleGuard)
+     @Roles(SystemRole.SUPERADMIN)
+     async findAll(@Request() req) {
+          return await this.usersService.findAll(req.user);
+     }
 
-     // @Post('register')
-     // registrarUser( @Body() registrarUsuarioDto: RegistrarUsuarioDto ) {
-     //      return  this.usersService.registrarUser(registrarUsuarioDto);
-     // }
+     @Get(':id')
+     @UseGuards(JwtAuthGuard, RoleGuard)
+     @Roles(SystemRole.SUPERADMIN)
+     async findOne(@Param('id', ParseIntPipe) id: number, @Request() req) {
+          return await this.usersService.findOne(id, req.user);
+     }
 
-     // @Delete(':id')
-     // @ApiOperation({ summary: 'Delete a user by ID' })
-     // @ApiParam({ name: 'id', type: 'number', description: 'User ID to be deleted' })
-     // @ApiResponse({ status: 200, description: 'User successfully deleted.' })
-     // @ApiResponse({ status: 404, description: 'User not found.' })
-     // deleteUser(@Param('id', ParseIntPipe) id: number) {
-     //      return  this.usersService.deleteUser(id);
-     // }
+     @Put(':id')
+     @UseGuards(JwtAuthGuard, RoleGuard)
+     @Roles(SystemRole.SUPERADMIN)
+     async update(
+          @Param('id', ParseIntPipe) id: number,
+          @Body() updateUserDto: UpdateUserDto,
+          @Request() req,
+     ) {
+          console.log(id, updateUserDto);
+          
+          return await this.usersService.update(id, updateUserDto, req.user);
+     }
 
-     // @Put(':id')
-     // @ApiOperation({ summary: 'Update a user by ID' })
-     // @ApiParam({ name: 'id', type: 'number', description: 'User ID to be updated' })
-     // @ApiResponse({ status: 200, description: 'User successfully updated.' })
-     // @ApiResponse({ status: 404, description: 'User not found.' })
-     // @ApiResponse({ status: 400, description: 'Validation failed' })
-     // async updateUser(
-     //      @Param('id', ParseIntPipe) id: number,
-     //      @Body() updateUserDto: UpdateUserRequestDto,
-     // ){
-     //      return await this.usersService.updateUser(id, updateUserDto);
-     // }
+     @Delete(':id')
+     @UseGuards(JwtAuthGuard, RoleGuard)
+     @Roles(SystemRole.SUPERADMIN)
+     async remove(@Param('id', ParseIntPipe) id: number, @Request() req) {
+          return await this.usersService.remove(id, req.user);
+     }
+
+     @Post(':userId/empresas')
+     @UseGuards(JwtAuthGuard, RoleGuard)
+     @Roles(SystemRole.SUPERADMIN)
+     async assignCompany(
+          @Param('userId', ParseIntPipe) userId: number,
+          @Body() assignCompanyDto: AssignCompanyDto,
+          @Request() req,
+     ) {
+          return await this.usersService.assignCompany(userId, assignCompanyDto, req.user);
+     }
+
+     @Delete(':userId/empresas/:empresaId')
+     @UseGuards(JwtAuthGuard, RoleGuard)
+     @Roles(SystemRole.SUPERADMIN)
+     async removeCompany(
+          @Param('userId', ParseIntPipe) userId: number,
+          @Param('empresaId', ParseIntPipe) empresaId: number,
+          @Request() req,
+     ) {
+          return await this.usersService.removeCompany(userId, empresaId, req.user);
+     }
 }
 

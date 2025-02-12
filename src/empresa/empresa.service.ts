@@ -10,6 +10,7 @@ import { Empresa } from './entities/empresa.entity';
 import { Repository } from 'typeorm';
 import { UsuarioEmpresa } from '../usuario_empresa/entities/usuario_empresa.entity';
 import { Usuario } from '../users/entities/user.entity';
+import { CompanyRole } from 'src/users/enums/role.enum';
 
 @Injectable()
 export class EmpresaService {
@@ -20,39 +21,52 @@ export class EmpresaService {
         private usuarioEmpresaRepository: Repository<UsuarioEmpresa>,
     ) { }
 
-    async findAll(usuarioId: number): Promise<Empresa[]> {
+    async findOne(id: number): Promise<Empresa> {
+        const empresa = await this.empresaRepository.findOne({
+            where: { id },
+            relations: ['createdBy']
+        });
+
+        if (!empresa) {
+            throw new NotFoundException('La empresa no existe');
+        }
+
+        return empresa;
+    }
+
+    async findAllByCreator(creatorId: number): Promise<Empresa[]> {
+        return this.empresaRepository.find({
+            where: { createdBy: { id: creatorId } },
+            relations: ['usuarios', 'usuarios.usuario']
+        });
+    }
+
+    async findAllByUser(userId: number): Promise<Empresa[]> {
         return this.empresaRepository
             .createQueryBuilder('empresa')
             .innerJoin('empresa.usuarios', 'usuarioEmpresa')
-            .where('usuarioEmpresa.usuarioId = :usuarioId', { usuarioId })
+            .where('usuarioEmpresa.usuarioId = :userId', { userId })
             .getMany();
     }
 
     async create(
         createEmpresaDTO: CreateEmpresaDto,
-        usuarioId: number,
-        file?: Express.Multer.File
+        creatorId: number,
     ): Promise<Empresa> {
-        // Create empresa
-        const empresa = new Empresa();
-        empresa.codigo = createEmpresaDTO.codigo;
-        empresa.ruc = createEmpresaDTO.ruc;
-        empresa.nombre = createEmpresaDTO.nombre;
-        empresa.correo = createEmpresaDTO.correo;
-        empresa.telefono = createEmpresaDTO.telefono;
-        empresa.direccion = createEmpresaDTO.direccion;
-
-        if (createEmpresaDTO.logo) {
-            empresa.logo = createEmpresaDTO.logo;
-        }
-                
+        // Crear la empresa
+        const empresa = this.empresaRepository.create({
+            ...createEmpresaDTO,
+            createdBy: { id: creatorId }
+        });
 
         const empresaGuardada = await this.empresaRepository.save(empresa);
 
-        // Create usuario_empresa relationship using repository methods
+        // Crear la relación usuario_empresa para el superadmin
         const usuarioEmpresa = this.usuarioEmpresaRepository.create({
-            usuario: { id: usuarioId },
+            usuario: { id: creatorId },
             empresa: empresaGuardada,
+            companyRole: CompanyRole.ADMIN, // Superadmin es ADMIN en su propia empresa
+            assignedBy: { id: creatorId }
         });
 
         await this.usuarioEmpresaRepository.save(usuarioEmpresa);
@@ -61,42 +75,25 @@ export class EmpresaService {
     }
 
     async update(id: number, updateEmpresaDTO: UpdateEmpresaDto): Promise<Empresa> {
-        const empresa = await this.empresaRepository.findOne({
-            where: { id }
+        const empresa = await this.findOne(id);
+
+        // Actualizar campos
+        Object.assign(empresa, {
+            ...updateEmpresaDTO,
+            logo: updateEmpresaDTO.logo && !updateEmpresaDTO.logo.startsWith('undefined')
+                ? updateEmpresaDTO.logo
+                : empresa.logo
         });
-
-        if (!empresa) {
-            throw new NotFoundException('La empresa no existe');
-        }
-
-        // Explicitly set each field
-        if (updateEmpresaDTO.codigo) empresa.codigo = updateEmpresaDTO.codigo;
-        if (updateEmpresaDTO.ruc) empresa.ruc = updateEmpresaDTO.ruc;
-        if (updateEmpresaDTO.nombre) empresa.nombre = updateEmpresaDTO.nombre;
-        if (updateEmpresaDTO.correo) empresa.correo = updateEmpresaDTO.correo;
-        if (updateEmpresaDTO.telefono) empresa.telefono = updateEmpresaDTO.telefono;
-        if (updateEmpresaDTO.direccion) empresa.direccion = updateEmpresaDTO.direccion;
-
-        // Explicitly handle logo
-        if (updateEmpresaDTO.logo && !updateEmpresaDTO.logo.startsWith('undefined')) {
-            empresa.logo = updateEmpresaDTO.logo;
-        }
 
         try {
             return await this.empresaRepository.save(empresa);
         } catch (error) {
-            console.error('Update error:', error);
             throw new BadRequestException('Error al actualizar la empresa: ' + error.message);
         }
     }
 
     async delete(id: number): Promise<void> {
-        const empresa = await this.empresaRepository.findOne({ where: { id } });
-
-        if (!empresa) {
-            throw new NotFoundException('La empresa no existe');
-        }
-
+        const empresa = await this.findOne(id);
         await this.empresaRepository.remove(empresa);
     }
 }

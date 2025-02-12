@@ -1,40 +1,24 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { Transform } from "class-transformer";
-import { IsBoolean, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from "class-validator";
+import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from "class-validator";
 
-export class RegisterDto{
-
-     @ApiProperty({ example: 'john.doe@example.com', description: 'The email of the user' })
+export class RegisterDto {
+     @ApiProperty({ example: 'john@example.com' })
      @IsEmail()
      @IsNotEmpty()
      email: string;
 
-     @ApiProperty({ example: 'Daniel', description: 'The name of the user', required: false })
-     @Transform(({value}) => value.trim())
+     @ApiProperty({ example: 'John' })
      @IsString()
-     @MinLength(1)
-     @IsNotEmpty()  
-     name: string;
+     @IsOptional()
+     name?: string;
 
-     @ApiProperty({ example: 'Velasco', description: 'The lastname of the user', required: false })
-     @Transform(({value}) => value.trim())
+     @ApiProperty({ example: 'Doe' })
      @IsString()
-     @MinLength(1)
-     @IsNotEmpty()  
-     lastname: string;
+     @IsOptional()
+     lastname?: string;
 
-     @ApiProperty({ example: 'password', description: 'the password of the user' })
-     @Transform(({value}) => value.trim())
+     @ApiProperty({ example: '123456' })
      @IsString()
      @MinLength(6)
      password: string;
-
-     @ApiProperty({ example: true, description: 'if the user is active or no' })
-     @IsBoolean()
-     active: boolean;
-
-     @IsString()
-     @IsOptional()   
-     tokens?: string;
-
 }

@@ -5,123 +5,169 @@ import {
      InternalServerErrorException,
      UnauthorizedException
 } from '@nestjs/common';
-import { UsersService } from 'src/users/users.service';
-import { RegisterDto } from './dtos/register.dto';
-import * as bcrypt from 'bcrypt';
-import { LoginDto } from './dtos/login.dto';
 import { JwtService } from '@nestjs/jwt';
-import { Usuario } from 'src/users/entities/user.entity';
-import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
-import { UsuarioEmpresa } from 'src/usuario_empresa/entities/usuario_empresa.entity';
-import { Empresa } from 'src/empresa/entities/empresa.entity';
-import { Role } from 'src/users/enums/role.enum';
+import { Repository } from 'typeorm';
+import * as bcrypt from 'bcrypt';
+
+import { Usuario } from 'src/users/entities/user.entity';
+import { UsuarioEmpresa } from '../usuario_empresa/entities/usuario_empresa.entity';
+import { SystemRole } from 'src/users/enums/role.enum';
+import { RegisterDto } from './dtos/register.dto';
+import { LoginDto } from './dtos/login.dto';
 
 @Injectable()
 export class AuthService {
      constructor(
-          private readonly userService: UsersService,
-          private readonly jwtService: JwtService,
-
           @InjectRepository(Usuario)
-          private userRepository: Repository<Usuario>,
-
+          private readonly usuarioRepository: Repository<Usuario>,
           @InjectRepository(UsuarioEmpresa)
-          private usuarioEmpresaRepository: Repository<UsuarioEmpresa>,
+          private readonly usuarioEmpresaRepository: Repository<UsuarioEmpresa>,
+          private readonly jwtService: JwtService,
      ) { }
 
      async registrarUser(registerDto: RegisterDto) {
           try {
-               const { name, lastname, email, password } = registerDto; 
+               const { name, lastname, email, password } = registerDto;
 
-               // Verificar si el email ya está registrado
-               const usuarioExistente = await this.userRepository.findOne({ where: { email } });
+               const usuarioExistente = await this.usuarioRepository.findOne({
+                    where: { email }
+               });
+
                if (usuarioExistente) {
                     throw new ConflictException('El email ya está registrado');
                }
 
-               // Crear el usuario con el rol asignado
-               const usuario = this.userRepository.create({
+               const usuario = this.usuarioRepository.create({
                     name,
                     lastname,
                     email,
                     password: await bcrypt.hash(password, 10),
-                    role: Role.SUPERADMIN, // Se asigna el rol
+                    systemRole: SystemRole.SUPERADMIN,
+                    createdBy: null
                });
 
-               const usuarioGuardado = await this.userRepository.save(usuario);
+               const usuarioGuardado = await this.usuarioRepository.save(usuario);
 
-               // Generar el token JWT
                const payload = {
+                    sub: usuarioGuardado.id,
+                    email: usuarioGuardado.email,
+                    name: usuarioGuardado.name,
+                    lastname: usuarioGuardado.lastname,
+                    systemRole: usuarioGuardado.systemRole,
+               };
+
+               const token = await this.jwtService.signAsync(payload);
+
+               // Guardar el token en el usuario
+               usuarioGuardado.tokens = token;
+               await this.usuarioRepository.save(usuarioGuardado);
+
+               return {
                     id: usuarioGuardado.id,
                     email: usuarioGuardado.email,
                     name: usuarioGuardado.name,
                     lastname: usuarioGuardado.lastname,
-                    role: usuarioGuardado.role, // Incluir el rol en el token
-               };
-               const token = await this.jwtService.signAsync(payload);
-
-               return {
-                    ...usuarioGuardado,
-                    tokens: token,
+                    systemRole: usuarioGuardado.systemRole,
+                    tokens: token
                };
           } catch (error) {
+               if (error instanceof ConflictException) {
+                    throw error;
+               }
                console.error('Error during registration:', error);
-               throw new InternalServerErrorException('An error occurred during registration');
+               throw new InternalServerErrorException('Error durante el registro');
           }
      }
-
 
      async login(loginDto: LoginDto) {
           try {
                const { email, password } = loginDto;
-               const user = await this.userService.findOneByEmail(email);
-               if (!user || !(await bcrypt.compare(password, user.password))) {
-                    throw new UnauthorizedException('El email o la password son incorrectos');
+               const usuario = await this.usuarioRepository.findOne({
+                    where: { email }
+               });
+
+               if (!usuario) {
+                    throw new UnauthorizedException('Credenciales inválidas');
                }
 
-               // Buscar empresa del usuario si no es Superadmin
-               let empresaId = null;
-               if (user.role !== 'superadmin') {
-                    const usuarioEmpresa = await this.usuarioEmpresaRepository.findOne({
-                         where: { usuario: { id: user.id } },
+               const isPasswordValid = await bcrypt.compare(password, usuario.password);
+               if (!isPasswordValid) {
+                    throw new UnauthorizedException('Credenciales inválidas');
+               }
+
+               // Buscar empresas asignadas si no es Superadmin
+               let empresasAsignadas = [];
+               if (usuario.systemRole !== SystemRole.SUPERADMIN) {
+                    const usuarioEmpresas = await this.usuarioEmpresaRepository.find({
+                         where: { usuario: { id: usuario.id } },
                          relations: ['empresa'],
                     });
-                    empresaId = usuarioEmpresa ? usuarioEmpresa.empresa.id : null;
+                    empresasAsignadas = usuarioEmpresas.map(ue => ({
+                         id: ue.empresa.id,
+                         nombre: ue.empresa.nombre,
+                         role: ue.companyRole
+                    }));
                }
 
                const payload = {
-                    id: user.id,
-                    email: user.email,
-                    name: user.name,
-                    lastname: user.lastname,
-                    role: user.role,
-                    empresaId: empresaId, // Asigna empresa si aplica
+                    sub: usuario.id,
+                    email: usuario.email,
+                    name: usuario.name,
+                    lastname: usuario.lastname,
+                    systemRole: usuario.systemRole,
+                    empresas: empresasAsignadas
                };
+
                const token = await this.jwtService.signAsync(payload);
 
-               let tokensArray = user.tokens ? user.tokens.split(', ') : [];
+               // Manejar tokens anteriores
+               let tokensArray = usuario.tokens ? usuario.tokens.split(', ') : [];
                if (tokensArray.length >= 5) tokensArray.shift();
                tokensArray.push(token);
-               await this.userService.updateUserToken(user.id, { tokens: tokensArray.join(', ') });
 
-               return { id: user.id, email: user.email, name: user.name, lastname: user.lastname, role: user.role, empresaId, tokens: token };
+               usuario.tokens = tokensArray.join(', ');
+               await this.usuarioRepository.save(usuario);
+
+               return {
+                    id: usuario.id,
+                    email: usuario.email,
+                    name: usuario.name,
+                    lastname: usuario.lastname,
+                    systemRole: usuario.systemRole,
+                    empresas: empresasAsignadas,
+                    tokens: token
+               };
           } catch (error) {
+               if (error instanceof UnauthorizedException) {
+                    throw error;
+               }
                console.error('Error during login:', error);
-               throw new InternalServerErrorException('An error occurred during login');
+               throw new InternalServerErrorException('Error durante el login');
           }
      }
 
      async logout(userId: number, token: string) {
-          const user = await this.userService.findOneById(userId);
+          try {
+               const usuario = await this.usuarioRepository.findOne({
+                    where: { id: userId }
+               });
 
-          if (!user || !user.tokens) {
-               throw new UnauthorizedException('User not found or already logged out');
+               if (!usuario || !usuario.tokens) {
+                    throw new UnauthorizedException('Usuario no encontrado o ya cerró sesión');
+               }
+
+               let tokensArray = usuario.tokens.split(', ').filter(t => t !== token);
+               usuario.tokens = tokensArray.length ? tokensArray.join(', ') : null;
+               await this.usuarioRepository.save(usuario);
+
+               return { message: 'Sesión cerrada exitosamente' };
+          } catch (error) {
+               if (error instanceof UnauthorizedException) {
+                    throw error;
+               }
+               console.error('Error during logout:', error);
+               throw new InternalServerErrorException('Error durante el cierre de sesión');
           }
-
-          let tokensArray = user.tokens.split(', ').filter(storedToken => storedToken !== token);
-          await this.userService.updateUserToken(userId, { tokens: tokensArray.length ? tokensArray.join(', ') : null });
-
-          return { message: 'Logout successful' };
      }
 }

@@ -1,39 +1,75 @@
-import { IsString, IsNotEmpty, IsBoolean, IsIn, IsOptional, IsEnum, MinLength, IsEmail } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEmail, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, MinLength, ValidateIf, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { CompanyRole, SystemRole } from '../enums/role.enum';
 
-export class CreateUserRequestDto {
-     @ApiProperty({ example: 'john.doe@example.com', description: 'The email of the user' })
+export class AssignCompanyDto {
+     @ApiProperty({ description: 'ID de la empresa' })
+     @IsNotEmpty()
+     @IsNumber()
+     empresaId: number;
+
+     @ApiProperty({
+          description: 'Rol del usuario en la empresa',
+          enum: CompanyRole
+     })
+     @IsEnum(CompanyRole)
+     @IsNotEmpty()
+     companyRole: CompanyRole;
+}
+
+export class CreateUserDto {
+     @ApiProperty({
+          description: 'Correo electrónico del usuario',
+          example: 'usuario@ejemplo.com'
+     })
      @IsEmail()
      @IsNotEmpty()
      email: string;
 
-     @ApiProperty({ example: 'Daniel', description: 'The name of the user', required: false })
-     @Transform(({value}) => value.trim())
-     @IsString()
-     @MinLength(1)
-     @IsNotEmpty()  
-     name: string;
-
-     @ApiProperty({ example: 'Velasco', description: 'The lastname of the user', required: false })
-     @Transform(({value}) => value.trim())
-     @IsString()
-     @MinLength(1)
-     @IsNotEmpty()  
-     lastname: string;
-
-     @ApiProperty({ example: 'password', description: 'the password of the user' })
-     @Transform(({value}) => value.trim())
+     @ApiProperty({
+          description: 'Contraseña del usuario',
+          minLength: 6,
+          example: '123456'
+     })
      @IsString()
      @MinLength(6)
      password: string;
-     
-     @ApiProperty({ example: true, description: 'if the user is active or no' })
-     @IsBoolean()
-     active: boolean;
-     
+
+     @ApiPropertyOptional({
+          description: 'Nombre del usuario',
+          example: 'Juan'
+     })
      @IsString()
-     @IsOptional()   
-     tokens?: string;
-     
+     @IsOptional()
+     name?: string;
+
+     @ApiPropertyOptional({
+          description: 'Apellido del usuario',
+          example: 'Pérez'
+     })
+     @IsString()
+     @IsOptional()
+     lastname?: string;
+
+     @ApiProperty({
+          description: 'Rol del usuario en el sistema',
+          enum: SystemRole,
+          example: SystemRole.ADMIN
+     })
+     @IsEnum(SystemRole)
+     @IsNotEmpty()
+     @ValidateIf((o) => o.systemRole !== SystemRole.SUPERADMIN, {
+          message: 'No se pueden crear usuarios con el rol SUPERADMIN',
+     })
+     systemRole: SystemRole;
+
+     @ApiPropertyOptional({
+          description: 'Lista de empresas y roles a asignar',
+          type: [AssignCompanyDto]
+     })
+     @IsOptional()
+     @ValidateNested({ each: true })
+     @Type(() => AssignCompanyDto)
+     empresas?: AssignCompanyDto[];
 }

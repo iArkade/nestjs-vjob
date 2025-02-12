@@ -1,39 +1,32 @@
-import { IsString, IsNotEmpty, IsBoolean, IsIn, IsOptional, IsEnum, IsEmail, MinLength } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
+import { PartialType, OmitType, ApiPropertyOptional } from '@nestjs/swagger';
+import { CreateUserDto } from './create.user.dto';
+import { IsOptional, IsBoolean, IsString, MinLength, ValidateIf } from 'class-validator';
 
-export class UpdateUserRequestDto {
-
-     @ApiProperty({ example: 'john.doe@example.com', description: 'The email of the user' })
-     @IsEmail()
+export class UpdateUserDto extends PartialType(
+     OmitType(CreateUserDto, ['systemRole'] as const) // Excluir systemRole de la herencia
+) {
+     @ApiPropertyOptional({
+          description: 'Estado activo del usuario',
+          example: true,
+     })
      @IsOptional()
-     email?: string;
-
-     @ApiProperty({ example: 'Daniel', description: 'The name of the user' })
-     @Transform(({value}) => value.trim())
-     @IsString()
-     @MinLength(1)
-     @IsOptional()  
-     name?: string;
-     
-     @ApiProperty({ example: 'Velasco', description: 'The lastname of the user' })
-     @Transform(({value}) => value.trim())
-     @IsString()
-     @MinLength(1)
-     @IsOptional()    
-     lastname?: string;
-
-     @ApiProperty({ example: 'password', description: 'the password of the user' })
-     @IsString()
-     @IsOptional()   
-     password?: string;
-     
-     @ApiProperty({ example: true, description: 'if the user is active or no' })
      @IsBoolean()
-     @IsOptional()
-     active?: boolean;  
+     active?: boolean;
 
+     @ApiPropertyOptional({
+          description: 'Contraseña del usuario',
+          minLength: 6,
+          example: '123456',
+     })
      @IsString()
-     @IsOptional()   
-     tokens?: string;
+     @MinLength(6)
+     @ValidateIf((o) => o.password !== undefined) // Solo validar si se proporciona
+     password?: string;
+
+     @ApiPropertyOptional({
+          description: 'Lista de empresas y roles a asignar',
+          type: [CreateUserDto['empresas']],
+     })
+     @IsOptional()
+     empresas?: CreateUserDto['empresas'];
 }
