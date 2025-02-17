@@ -132,7 +132,12 @@ export class UsersService {
                };
 
                Object.assign(usuario, userToUpdate);
-               return await transactionalEntityManager.save(Usuario, usuario);
+               await transactionalEntityManager.save(Usuario, usuario);
+
+               return await transactionalEntityManager.findOne(Usuario, {
+                    where: { id },
+                    relations: ['empresas', 'empresas.empresa'],
+               });
           });
      }
 
@@ -159,7 +164,22 @@ export class UsersService {
      async remove(id: number, superadmin: Usuario) {
           return await this.usuarioRepository.manager.transaction(async transactionalEntityManager => {
                const usuario = await this.findOne(id, superadmin);
+
+               if (!usuario) {
+                    throw new NotFoundException('Usuario no encontrado');
+               }
+
+               // Primero eliminamos todas las relaciones usuario_empresa
+               await transactionalEntityManager
+                    .createQueryBuilder()
+                    .delete()
+                    .from(UsuarioEmpresa)
+                    .where("usuarioId = :userId", { userId: usuario.id })
+                    .execute();
+
+               // Luego eliminamos el usuario 
                await transactionalEntityManager.remove(Usuario, usuario);
+               
                return { message: 'Usuario eliminado correctamente' };
           });
      }
