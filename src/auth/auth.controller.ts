@@ -63,8 +63,11 @@ export class AuthController {
           }
 
           const token = authHeader.split(' ')[1];
-          const userId = req.user.id;
+          if (!token) {
+               throw new UnauthorizedException('Invalid token');
+          }
 
+          const userId = req.user.id;
           return await this.authService.logout(userId, token);
      }
 }

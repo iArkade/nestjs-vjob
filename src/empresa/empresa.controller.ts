@@ -36,6 +36,8 @@ export class EmpresaController {
         const user = req.user;
         
         if (user.systemRole === SystemRole.SUPERADMIN) {
+            console.log(user.id, user);
+            
             // Superadmin ve solo las empresas que creó
             return await this.empresaService.findAllByCreator(user.id);
         } else {

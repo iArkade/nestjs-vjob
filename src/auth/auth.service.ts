@@ -153,12 +153,21 @@ export class AuthService {
                     where: { id: userId }
                });
 
-               if (!usuario || !usuario.tokens) {
-                    throw new UnauthorizedException('Usuario no encontrado o ya cerró sesión');
+               if (!usuario) {
+                    throw new UnauthorizedException('Usuario no encontrado');
                }
 
-               let tokensArray = usuario.tokens.split(', ').filter(t => t !== token);
+               if (!usuario.tokens) {
+                    throw new UnauthorizedException('El usuario ya cerró sesión');
+               }
+
+               // Filtra el token actual
+               const tokensArray = usuario.tokens.split(', ').filter(t => t !== token);
+
+               // Si no quedan tokens, establece el campo como null
                usuario.tokens = tokensArray.length ? tokensArray.join(', ') : null;
+
+               // Guarda los cambios en la base de datos
                await this.usuarioRepository.save(usuario);
 
                return { message: 'Sesión cerrada exitosamente' };
