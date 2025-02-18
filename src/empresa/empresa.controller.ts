@@ -174,6 +174,20 @@ export class EmpresaController {
             if (empresa.createdBy.id !== user.id) {
                 throw new ForbiddenException('No tienes permiso para eliminar esta empresa');
             }
+
+            // Eliminar el archivo de logo si existe
+            if (empresa.logo) {
+                try {
+                    const logoUrl = new URL(empresa.logo);
+                    const fileName = path.basename(logoUrl.pathname);
+                    const filePath = path.join('./uploads/logos', fileName);
+
+                    await unlink(filePath);
+                } catch (error) {
+                    console.error('Error al eliminar el archivo del logo:', error);
+                    // Continuar con la eliminación de la empresa incluso si falla la eliminación del archivo
+                }
+            }
         } else {
             throw new ForbiddenException('Solo los superadmins pueden eliminar empresas');
         }
