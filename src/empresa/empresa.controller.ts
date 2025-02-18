@@ -36,7 +36,6 @@ export class EmpresaController {
         const user = req.user;
         
         if (user.systemRole === SystemRole.SUPERADMIN) {
-            console.log(user.id, user);
             
             // Superadmin ve solo las empresas que creó
             return await this.empresaService.findAllByCreator(user.id);
@@ -93,10 +92,36 @@ export class EmpresaController {
     }
 
     @Put(':id')
+    @UseInterceptors(
+        FileInterceptor('logo', {
+            storage: diskStorage({
+                destination: './uploads/logos',
+                filename: (req, file, cb) => {
+                    try {
+                        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+                        const ext = path.extname(file.originalname || '');
+                        cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
+                    } catch (error) {
+                        cb(new Error('Error al procesar el archivo'), null);
+                    }
+                },
+            }),
+            fileFilter: (req, file, cb) => {
+                if (!file.mimetype.match(/image\/(jpeg|png|jpg|webp)/)) {
+                    return cb(new Error('Solo se permiten archivos de imagen'), false);
+                }
+                if (!file.originalname) {
+                    return cb(new Error('El archivo no tiene un nombre válido'), false);
+                }
+                cb(null, true);
+            },
+        }),
+    )
     async update(
         @Req() req,
         @Param('id', ParseIntPipe) id: number,
         @Body() updateEmpresaDTO: UpdateEmpresaDto,
+        @UploadedFile() file: Express.Multer.File,
     ): Promise<Empresa> {
         const user = req.user;
         
@@ -106,10 +131,14 @@ export class EmpresaController {
             if (empresa.createdBy.id !== user.id) {
                 throw new ForbiddenException('No tienes permiso para modificar esta empresa');
             }
+            if (file) {
+                const baseUrl = process.env.BASE_URL || 'http://localhost:4000';
+                updateEmpresaDTO.logo = `${baseUrl}/uploads/logos/${file.filename}`;
+            }
+
         } else {
             throw new ForbiddenException('Solo los superadmins pueden modificar empresas');
         }
-
         return await this.empresaService.update(id, updateEmpresaDTO);
     }
 
