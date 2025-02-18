@@ -76,7 +76,6 @@ export class EmpresaService {
 
     async update(id: number, updateEmpresaDTO: UpdateEmpresaDto): Promise<Empresa> {
         const empresa = await this.findOne(id);
-
         // Actualizar campos
         Object.assign(empresa, {
             ...updateEmpresaDTO,
