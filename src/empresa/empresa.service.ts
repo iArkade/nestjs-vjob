@@ -93,6 +93,17 @@ export class EmpresaService {
 
     async delete(id: number): Promise<void> {
         const empresa = await this.findOne(id);
+
+        if (!empresa) {
+            throw new NotFoundException('Empresa no encontrada');
+        }
+
+        // Elimina los registros relacionados en usuario_empresa primero
+        await this.empresaRepository.query(
+            'DELETE FROM usuario_empresa WHERE empresaId = ?',
+            [id]
+        );
+
         await this.empresaRepository.remove(empresa);
     }
 }
