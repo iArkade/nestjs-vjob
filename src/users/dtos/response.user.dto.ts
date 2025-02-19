@@ -15,7 +15,7 @@ export class UserResponseDto {
     @ApiProperty({ example: 'Pérez' })
     lastname: string;
 
-    @ApiProperty({ enum: SystemRole, example: SystemRole.ADMIN })
+    @ApiProperty({ enum: SystemRole, example: SystemRole.USER })
     systemRole: SystemRole;
 
     @ApiProperty({ example: true })

@@ -70,15 +70,12 @@ export class UsersService {
                throw new ForbiddenException('Solo los superadmins pueden crear usuarios');
           }
 
-          if (createUserDto.systemRole === SystemRole.SUPERADMIN) {
-               throw new ForbiddenException('No se pueden crear usuarios SUPERADMIN');
-          }
-
           return await this.usuarioRepository.manager.transaction(async transactionalEntityManager => {
                // Crear usuario
                const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
                const usuario = transactionalEntityManager.create(Usuario, {
                     ...createUserDto,
+                    systemRole: SystemRole.USER,
                     password: hashedPassword,
                     createdBy: superadmin,
                });
