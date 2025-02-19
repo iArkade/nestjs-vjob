@@ -2,9 +2,7 @@ import { PartialType, OmitType, ApiPropertyOptional } from '@nestjs/swagger';
 import { CreateUserDto } from './create.user.dto';
 import { IsOptional, IsBoolean, IsString, MinLength, ValidateIf } from 'class-validator';
 
-export class UpdateUserDto extends PartialType(
-     OmitType(CreateUserDto, ['systemRole'] as const) // Excluir systemRole de la herencia
-) {
+export class UpdateUserDto extends PartialType(CreateUserDto) {
      @ApiPropertyOptional({
           description: 'Estado activo del usuario',
           example: true,

@@ -52,18 +52,6 @@ export class CreateUserDto {
      @IsOptional()
      lastname?: string;
 
-     @ApiProperty({
-          description: 'Rol del usuario en el sistema',
-          enum: SystemRole,
-          example: SystemRole.ADMIN
-     })
-     @IsEnum(SystemRole)
-     @IsNotEmpty()
-     @ValidateIf((o) => o.systemRole !== SystemRole.SUPERADMIN, {
-          message: 'No se pueden crear usuarios con el rol SUPERADMIN',
-     })
-     systemRole: SystemRole;
-
      @ApiPropertyOptional({
           description: 'Lista de empresas y roles a asignar',
           type: [AssignCompanyDto]
