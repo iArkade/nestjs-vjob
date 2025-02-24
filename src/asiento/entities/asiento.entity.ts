@@ -44,7 +44,7 @@ export class Asiento {
 
   // Relación con AsientoItem
   @OneToMany(() => AsientoItem, (asientoItem) => asientoItem.asiento, {
-    cascade: false,
+    cascade: true,
     eager: false,
   })
   lineItems: AsientoItem[];
