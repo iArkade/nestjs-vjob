@@ -25,7 +25,6 @@ export class AsientoService {
     });
   }
 
-
   async createAsientoWithItems(createAsientoDto: CreateAsientoDto) {
     const { lineItems, fecha_emision, ...asientoData } = createAsientoDto;
     const fechaEmisionFinal = fecha_emision || new Date();
@@ -67,16 +66,27 @@ export class AsientoService {
     if (!asiento) {
       throw new NotFoundException('Asiento no encontrado');
     }
+
+    const updatedAsiento = { 
+      ...asiento, 
+      ...asientoData,
+      lineItems: lineItems 
+    };    
+    await this.asientoRepository.save(updatedAsiento);
+
+    return updatedAsiento;
   
-    // Continúa con la lógica actual de actualización...
   }
   
 
   async deleteAsiento(id: number, empresa_id: number): Promise<void> {
+    console.log(id, empresa_id)
+    
     const asiento = await this.asientoRepository.findOne({
       where: { id, empresa_id },
       relations: ['lineItems'],
     });
+
   
     if (!asiento) {
       throw new NotFoundException('Asiento no encontrado');

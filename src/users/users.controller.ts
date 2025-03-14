@@ -16,10 +16,30 @@ export class UsersController {
      ) { }
 
      @Post()
-     @UseGuards(JwtAuthGuard, RoleGuard)
-     @Roles(SystemRole.SUPERADMIN)
+     @UseGuards(JwtAuthGuard)
      async create(@Request() req, @Body() createUserDto: CreateUserDto) {
           return await this.usersService.create(createUserDto, req.user);
+     }
+
+     @Post('empresa/:empresaId')
+     @UseGuards(JwtAuthGuard)
+     async createByEmpresa(
+          @Param('empresaId', ParseIntPipe) empresaId: number,
+          @Body() createUserDto: CreateUserDto,
+          @Request() req,
+     ) {
+          return this.usersService.createByEmpresa(empresaId, createUserDto, req.user);
+     }
+
+     @Put('empresa/:empresaId/:userId')
+     @UseGuards(JwtAuthGuard)
+     async updateByEmpresa(
+          @Param('empresaId', ParseIntPipe) empresaId: number,
+          @Param('userId', ParseIntPipe) userId: number,
+          @Body() updateUserDto: UpdateUserDto,
+          @Request() req
+     ) {
+          return await this.usersService.updateByEmpresa(empresaId, userId, updateUserDto, req.user);
      }
 
      @Get()
@@ -27,6 +47,12 @@ export class UsersController {
      @Roles(SystemRole.SUPERADMIN)
      async findAll(@Request() req) {
           return await this.usersService.findAll(req.user);
+     }
+
+     @Get('empresa/:empresaId')
+     @UseGuards(JwtAuthGuard)
+     async findAllByEmpresa(@Param('empresaId', ParseIntPipe) empresaId: number, @Request() req) {
+          return this.usersService.findAllByEmpresa(empresaId, req.user);
      }
 
      @Get(':id')
@@ -43,7 +69,7 @@ export class UsersController {
           @Param('id', ParseIntPipe) id: number,
           @Body() updateUserDto: UpdateUserDto,
           @Request() req,
-     ) {          
+     ) {
           return await this.usersService.update(id, updateUserDto, req.user);
      }
 
@@ -75,5 +101,7 @@ export class UsersController {
      ) {
           return await this.usersService.removeCompany(userId, empresaId, req.user);
      }
+
+
 }
 

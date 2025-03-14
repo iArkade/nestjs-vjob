@@ -56,6 +56,7 @@ export class CreateUserDto {
           description: 'Lista de empresas y roles a asignar',
           type: [AssignCompanyDto]
      })
+     
      @IsOptional()
      @ValidateNested({ each: true })
      @Type(() => AssignCompanyDto)
