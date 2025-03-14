@@ -7,21 +7,6 @@ export class AsientoItem {
      @PrimaryGeneratedColumn()
      id: number;
 
-     // @Column()
-     // empresa_id: number;
-
-     // @Column()
-     // nro_asiento: string;
-
-     // @Column()
-     // nro_linea: number;
-
-     // @Column()
-     // codigo_contable: string;
-
-     // @Column()
-     // id_asiento_item: string;
-
      @Column()
      codigo_centro: string;
 

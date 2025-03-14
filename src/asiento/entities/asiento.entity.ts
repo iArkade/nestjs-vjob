@@ -10,8 +10,6 @@ export class Asiento {
   @Column({ nullable: false })
   empresa_id: number;
 
-  // @Column({ nullable: true })
-  // fecha_emision: string;
   @Column({ type: 'date', nullable: true })
   fecha_emision: Date;
 
