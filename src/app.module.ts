@@ -12,6 +12,7 @@ import { TransaccionContableModule } from './transaccion-contable/transaccion-co
 import { EmpresaModule } from './empresa/empresa.module';
 import { UsuarioEmpresa } from './usuario_empresa/entities/usuario_empresa.entity';
 import { Permisos } from './permisos/entities/permisos.entity';
+import { ReportesModule } from './reportes/reportes.module';
 
 @Module({
   imports: [
@@ -27,7 +28,8 @@ import { Permisos } from './permisos/entities/permisos.entity';
     TransaccionContableModule,
     EmpresaModule,
     UsuarioEmpresa,
-    Permisos
+    Permisos,
+    ReportesModule
   ],
   controllers: [AppController],
   providers: [AppService],
