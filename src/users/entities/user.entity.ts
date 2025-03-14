@@ -35,7 +35,8 @@ export class Usuario {
      // El superadmin que creó este usuario (null si es un superadmin)
      @ManyToOne(() => Usuario, (usuario) => usuario.usuariosCreados, {
           nullable: true,
-          onDelete: 'SET NULL'
+          onDelete: 'SET NULL',
+          eager: false,
      })
      createdBy: Usuario;
 

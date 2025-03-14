@@ -56,7 +56,6 @@ export class AsientoService {
 
 
   async updateAsiento(id: number, updateAsientoDto: UpdateAsientoDto, empresa_id: number) {
-    console.log(updateAsientoDto)
     const { lineItems, ...asientoData } = updateAsientoDto;
   
     const asiento = await this.asientoRepository.findOne({
@@ -81,10 +80,13 @@ export class AsientoService {
   
 
   async deleteAsiento(id: number, empresa_id: number): Promise<void> {
+    console.log(id, empresa_id)
+    
     const asiento = await this.asientoRepository.findOne({
       where: { id, empresa_id },
       relations: ['lineItems'],
     });
+
   
     if (!asiento) {
       throw new NotFoundException('Asiento no encontrado');

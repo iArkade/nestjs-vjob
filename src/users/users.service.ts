@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
@@ -138,6 +138,148 @@ export class UsersService {
           });
      }
 
+     async createByEmpresa(empresaId: number, createUserDto: CreateUserDto, currentUser: Usuario) {
+          if (currentUser.systemRole !== SystemRole.SUPERADMIN) {
+               const acceso = await this.usuarioEmpresaRepository.findOne({
+                    where: {
+                         usuario: { id: currentUser.id },
+                         empresa: { id: empresaId }
+                    }
+               });
+
+               if (!acceso) {
+                    throw new ForbiddenException('No tienes acceso a esta empresa');
+               }
+          }
+          const existingUser = await this.usuarioRepository.findOne({ where: { email: createUserDto.email } });
+          if (existingUser) {
+               throw new ConflictException('El email ya está en uso');
+          }
+
+          const nuevoUsuario = this.usuarioRepository.create({
+               ...createUserDto, // Mantiene los datos del DTO
+               password: await bcrypt.hash(createUserDto.password, 10), // Hashear contraseña
+               systemRole: currentUser.systemRole === SystemRole.SUPERADMIN ? SystemRole.USER : SystemRole.USER, // Siempre USER si no es SUPERADMIN
+               createdBy: { id: currentUser.id }, // Agregar relación sin modificar el DTO
+          });
+
+
+          // Guardar usuario en la base de datos
+          const savedUser = await this.usuarioRepository.save(nuevoUsuario);
+
+          // Crear relación usuario-empresa
+          const usuarioEmpresa = this.usuarioEmpresaRepository.create({
+               usuario: savedUser,
+               empresa: { id: empresaId },
+               companyRole: createUserDto.empresas[0].companyRole, // Tomamos el rol enviado desde el frontend
+          });
+
+          await this.usuarioEmpresaRepository.save(usuarioEmpresa);
+          const userWithRelations = await this.usuarioRepository.findOne({
+               where: { id: savedUser.id },
+               relations: ['empresas', 'empresas.empresa'], // Cargar relaciones
+          });
+
+          return userWithRelations;
+     }
+
+     async updateByEmpresa(empresaId: number, userId: number, updateUserDto: UpdateUserDto, currentUser: Usuario) {
+          // Verificar si el usuario tiene acceso a la empresa (excepto SUPERADMIN)
+          if (currentUser.systemRole !== SystemRole.SUPERADMIN) {
+               const acceso = await this.usuarioEmpresaRepository.findOne({
+                    where: {
+                         usuario: { id: currentUser.id },
+                         empresa: { id: empresaId },
+                    },
+               });
+
+               if (!acceso) {
+                    throw new ForbiddenException('No tienes acceso a esta empresa');
+               }
+          }
+
+          // Buscar usuario a actualizar
+          const userToUpdate = await this.usuarioRepository.findOne({
+               where: { id: userId },
+               relations: ['empresas', 'empresas.empresa'],
+          });
+
+          if (!userToUpdate) {
+               throw new NotFoundException('Usuario no encontrado');
+          }
+
+          // Verificar si el email ya existe en otro usuario
+          if (updateUserDto.email && updateUserDto.email !== userToUpdate.email) {
+               const existingUser = await this.usuarioRepository.findOne({ where: { email: updateUserDto.email } });
+               if (existingUser) {
+                    throw new ConflictException('El email ya está en uso por otro usuario');
+               }
+          }
+
+          // Manejo seguro de password para evitar errores con valores vacíos
+          const newPassword = updateUserDto.password && updateUserDto.password !== ""
+               ? await bcrypt.hash(updateUserDto.password, 10)
+               : userToUpdate.password;
+
+          // Actualizar usuario con los datos permitidos
+          await this.usuarioRepository.update(userId, {
+               name: updateUserDto.name ?? userToUpdate.name,
+               lastname: updateUserDto.lastname ?? userToUpdate.lastname,
+               email: updateUserDto.email ?? userToUpdate.email,
+               password: newPassword,
+          });
+
+          // Actualizar los roles en las empresas asociadas al usuario
+          if (updateUserDto.empresas && updateUserDto.empresas.length > 0) {
+               for (const empresa of updateUserDto.empresas) {
+                    const usuarioEmpresa = await this.usuarioEmpresaRepository.findOne({
+                         where: { usuario: { id: userId }, empresa: { id: empresa.empresaId } },
+                    });
+
+                    if (usuarioEmpresa) {
+                         usuarioEmpresa.companyRole = empresa.companyRole;
+                         await this.usuarioEmpresaRepository.save(usuarioEmpresa);
+                    }
+               }
+          }
+
+          // Retornar usuario actualizado con las relaciones cargadas
+          return await this.usuarioRepository.findOne({
+               where: { id: userId },
+               relations: ['empresas', 'empresas.empresa'],
+          });
+     }
+
+
+     async findAllByEmpresa(empresaId: number, currentUser: Usuario) {
+          const queryBase = this.usuarioRepository
+               .createQueryBuilder('usuario')
+               .leftJoinAndSelect('usuario.empresas', 'usuarioEmpresa')
+               .leftJoinAndSelect('usuarioEmpresa.empresa', 'empresa')
+               .leftJoin('usuario.createdById', 'createdById') 
+               .addSelect(['createdById.id'])
+               .where('empresa.id = :empresaId', { empresaId });
+
+          // Si el usuario no es SUPERADMIN, validar su acceso y ocultar otros SUPERADMIN
+          if (currentUser.systemRole !== SystemRole.SUPERADMIN) {
+               const tieneAcceso = await this.usuarioEmpresaRepository.exists({
+                    where: { usuario: { id: currentUser.id }, empresa: { id: empresaId } },
+               });
+
+               if (!tieneAcceso) {
+                    throw new ForbiddenException('No tienes acceso a esta empresa');
+               }
+
+               // Ocultar usuarios SUPERADMIN para usuarios normales
+               queryBase.andWhere('usuario.systemRole != :superadminRole', {
+                    superadminRole: SystemRole.SUPERADMIN,
+               });
+          }
+
+          return queryBase.getMany();
+     }
+
+
      async findAll(superadmin: Usuario) {
           return await this.usuarioRepository.find({
                where: { createdBy: { id: superadmin.id } },
@@ -176,7 +318,7 @@ export class UsersService {
 
                // Luego eliminamos el usuario 
                await transactionalEntityManager.remove(Usuario, usuario);
-               
+
                return { message: 'Usuario eliminado correctamente' };
           });
      }
