@@ -256,8 +256,8 @@ export class UsersService {
                .createQueryBuilder('usuario')
                .leftJoinAndSelect('usuario.empresas', 'usuarioEmpresa')
                .leftJoinAndSelect('usuarioEmpresa.empresa', 'empresa')
-               .leftJoin('usuario.createdById', 'createdById') 
-               .addSelect(['createdById.id'])
+               .leftJoin('usuario.createdBy', 'createdBy') 
+               .addSelect(['createdBy.id'])
                .where('empresa.id = :empresaId', { empresaId });
 
           // Si el usuario no es SUPERADMIN, validar su acceso y ocultar otros SUPERADMIN
