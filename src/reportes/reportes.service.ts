@@ -45,7 +45,7 @@ export class ReportesService {
         const accountHierarchy = this.buildAccountHierarchy(accountPlans);
 
         // Calculate totals for each account
-        const accountTotals = this.calculateAccountTotals(entries, accountPlans);
+        const accountTotals = this.calculateAccountTotals(entries, accountPlans, fromDate, toDate);
 
         // Build the report structure
         const report = this.buildReportStructure(accountHierarchy, accountTotals, level);
@@ -93,65 +93,80 @@ export class ReportesService {
         return hierarchy;
     }
 
-    private calculateAccountTotals(entries: Asiento[], accounts: AccountingPlan[]) {
+    private calculateAccountTotals(entries: Asiento[], accounts: AccountingPlan[], startDate: Date, endDate: Date) {
         const accountTotals = {};
-
-        // Initialize all accounts with zero
+    
+        // Inicializar todas las cuentas con valores en cero
         accounts.forEach(account => {
             accountTotals[account.code] = {
-                monthly: 0,
-                total: 0
+                debeMonthly: 0,
+                haberMonthly: 0,
+                debeTotal: 0,
+                haberTotal: 0,
             };
         });
-
-        // Process each entry and its items
+    
+        console.log(entries);
+        
+        // Procesar cada asiento y sus items
         entries.forEach(entry => {
+            const entryDate = new Date(entry.fecha_emision);
+    
             entry.lineItems.forEach(item => {
                 const accountCode = item.cta;
                 if (accountTotals[accountCode]) {
-                    // For income accounts (4.x), debit increases
-                    if (accountCode.startsWith('4')) {
-                        accountTotals[accountCode].monthly += item.debe - item.haber;
-                        accountTotals[accountCode].total += item.debe - item.haber;
+                    // Sumar para el período mensual (dentro del rango de fechas)
+                    if (entryDate >= startDate && entryDate <= endDate) {
+                        accountTotals[accountCode].debeMonthly += item.debe;
+                        accountTotals[accountCode].haberMonthly += item.haber;
+
+                        console.log(accountTotals);
                     }
-                    // For expense accounts (5.x), credit increases
-                    else if (accountCode.startsWith('5')) {
-                        accountTotals[accountCode].monthly += item.haber - item.debe;
-                        accountTotals[accountCode].total += item.haber - item.debe;
+                    // Sumar para el total acumulado (desde el inicio del período hasta endDate)
+                    if (entryDate <= endDate) {
+                        accountTotals[accountCode].debeTotal += item.debe;
+                        accountTotals[accountCode].haberTotal += item.haber;
                     }
                 }
             });
         });
-
+    
         return accountTotals;
     }
 
     private buildReportStructure(hierarchy, accountTotals, level = null) {
         const report = [];
-
-        // Get root accounts (4.x and 5.x)
+    
+        // Obtener las cuentas raíz (4.x y 5.x)
         const rootAccounts = Object.values(hierarchy).filter((account: any) =>
             account.parent === null && (account.isIncome || account.isExpense)
         );
-
-        // Sort by code
+    
+        // Ordenar por código
         rootAccounts.sort((a: any, b: any) => a.code.localeCompare(b.code));
-
-        // Process each root account and its descendants
+    
+        // Procesar cada cuenta raíz y sus descendientes
         rootAccounts.forEach((rootAccount: any) => {
-            // Check if we should include this account based on level
+            // Verificar si debemos incluir esta cuenta basado en el nivel
             if (level === null || rootAccount.level <= level) {
+                const monthlyDebe = this.sumAccountTotals(rootAccount, accountTotals, 'debeMonthly');
+                const monthlyHaber = this.sumAccountTotals(rootAccount, accountTotals, 'haberMonthly');
+                const totalDebe = this.sumAccountTotals(rootAccount, accountTotals, 'debeTotal');
+                const totalHaber = this.sumAccountTotals(rootAccount, accountTotals, 'haberTotal');
+    
                 report.push({
                     code: rootAccount.code,
                     name: rootAccount.name,
                     level: rootAccount.level,
-                    monthly: accountTotals[rootAccount.code]?.monthly || 0,
-                    total: accountTotals[rootAccount.code]?.total || 0,
+                    debeMonthly: monthlyDebe,
+                    haberMonthly: monthlyHaber,
+                    debeTotal: totalDebe,
+                    haberTotal: totalHaber,
                     isHeader: true
                 });
             }
-
-            // Process children recursively
+    
+            // Procesar hijos recursivamente
             this.addChildrenToReport(
                 report,
                 rootAccount,
@@ -160,8 +175,22 @@ export class ReportesService {
                 level
             );
         });
-
+    
         return report;
+    }
+    
+    private sumAccountTotals(account, accountTotals, field) {
+        let total = accountTotals[account.code]?.[field] || 0;
+    
+        // Sumar los valores de los hijos
+        account.children.forEach(childCode => {
+            const childAccount = accountTotals[childCode];
+            if (childAccount) {
+                total += childAccount[field] || 0;
+            }
+        });
+    
+        return total;
     }
 
     private addChildrenToReport(
@@ -171,25 +200,32 @@ export class ReportesService {
         accountTotals,
         level = null
     ) {
-        // Sort children by code
+        // Ordenar hijos por código
         const sortedChildren = [...parentAccount.children].sort();
-
+    
         sortedChildren.forEach(childCode => {
             const childAccount = hierarchy[childCode];
-
-            // Check if we should include this account based on level
+    
+            // Verificar si debemos incluir esta cuenta basado en el nivel
             if (level === null || childAccount.level <= level) {
+                const monthlyDebe = accountTotals[childAccount.code]?.debeMonthly || 0;
+                const monthlyHaber = accountTotals[childAccount.code]?.haberMonthly || 0;
+                const totalDebe = accountTotals[childAccount.code]?.debeTotal || 0;
+                const totalHaber = accountTotals[childAccount.code]?.haberTotal || 0;
+    
                 report.push({
                     code: childAccount.code,
                     name: childAccount.name,
                     level: childAccount.level,
-                    monthly: accountTotals[childAccount.code]?.monthly || 0,
-                    total: accountTotals[childAccount.code]?.total || 0,
+                    debeMonthly: monthlyDebe,
+                    haberMonthly: monthlyHaber,
+                    debeTotal: totalDebe,
+                    haberTotal: totalHaber,
                     isHeader: childAccount.children.length > 0
                 });
             }
-
-            // Recursively add children
+    
+            // Agregar hijos recursivamente
             if (childAccount.children.length > 0) {
                 this.addChildrenToReport(
                     report,
@@ -203,60 +239,41 @@ export class ReportesService {
     }
 
     private calculateReportTotals(report) {
-        // Calculate subtotals for parent accounts
-        for (let i = report.length - 1; i >= 0; i--) {
-            const account = report[i];
-
-            if (account.isHeader) {
-                // Find all direct children
-                const childrenIndices = [];
-                let level = account.level;
-
-                for (let j = i + 1; j < report.length; j++) {
-                    if (report[j].level <= level) {
-                        break;
-                    }
-
-                    if (report[j].level === level + 1) {
-                        childrenIndices.push(j);
-                    }
-                }
-
-                // Sum up children values
-                let monthlySum = 0;
-                let totalSum = 0;
-
-                childrenIndices.forEach(idx => {
-                    monthlySum += report[idx].monthly;
-                    totalSum += report[idx].total;
-                });
-
-                // Update parent account
-                account.monthly = monthlySum;
-                account.total = totalSum;
-            }
-        }
-
-        // Calculate total income and expenses
         let totalIncome = 0;
         let totalExpenses = 0;
 
+        //console.log(report);
+        
+    
+        // Calcular ingresos y gastos totales
         report.forEach(item => {
             if (item.code.startsWith('4') && item.level === 1) {
-                totalIncome += item.total;
+                totalIncome += item.haberTotal - item.debeTotal;
             } else if (item.code.startsWith('5') && item.level === 1) {
-                totalExpenses += item.total;
+                totalExpenses += item.debeTotal - item.haberTotal;
             }
         });
-
-        // Add net profit/loss row
+    
+        // Agregar fila de utilidad o pérdida
         report.push({
             code: 'NET',
             name: 'UTILIDAD O PÉRDIDA',
             level: 0,
-            monthly: totalIncome - totalExpenses,
-            total: totalIncome - totalExpenses,
+            debeMonthly: 0,
+            haberMonthly: totalIncome - totalExpenses,
+            debeTotal: 0,
+            haberTotal: totalIncome - totalExpenses,
             isHeader: true
         });
     }
 }
+
+
+// report.push({
+//     code: 'NET',
+//     name: 'UTILIDAD O PÉRDIDA',
+//     level: 0,
+//     monthly: totalIncome - totalExpenses,
+//     total: totalIncome - totalExpenses,
+//     isHeader: true
+// });
