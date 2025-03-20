@@ -250,13 +250,51 @@ export class UsersService {
           });
      }
 
+     async deleteByEmpresa(empresaId: number, userId: number, currentUser: Usuario) {
+          if (currentUser.systemRole !== SystemRole.SUPERADMIN) {
+               const acceso = await this.usuarioEmpresaRepository.findOne({
+                    where: { usuario: { id: currentUser.id }, empresa: { id: empresaId } },
+               });
+
+               if (!acceso) {
+                    throw new ForbiddenException('No tienes acceso a esta empresa');
+               }
+          }
+
+          const userToDelete = await this.usuarioRepository.findOne({
+               where: { id: userId },
+               relations: ['empresas'],
+          });
+
+          if (!userToDelete) {
+               throw new NotFoundException('Usuario no encontrado');
+          }
+
+          const relacionUsuarioEmpresa = await this.usuarioEmpresaRepository.findOne({
+               where: { usuario: { id: userId }, empresa: { id: empresaId } },
+          });
+
+          if (!relacionUsuarioEmpresa) {
+               throw new NotFoundException('El usuario no pertenece a esta empresa');
+          }
+
+          if (userToDelete.empresas.length > 1) {
+               // Si pertenece a más de una empresa, solo eliminamos la relación
+               await this.usuarioEmpresaRepository.delete({ usuario: { id: userId }, empresa: { id: empresaId } });
+          } else {
+               // Si solo pertenece a una empresa, eliminará automáticamente la relación en usuario_empresa por el CASCADE
+               await this.usuarioRepository.delete(userId);
+          }
+
+          return { message: 'Usuario eliminado correctamente' };
+     }
 
      async findAllByEmpresa(empresaId: number, currentUser: Usuario) {
           const queryBase = this.usuarioRepository
                .createQueryBuilder('usuario')
                .leftJoinAndSelect('usuario.empresas', 'usuarioEmpresa')
                .leftJoinAndSelect('usuarioEmpresa.empresa', 'empresa')
-               .leftJoin('usuario.createdBy', 'createdBy') 
+               .leftJoin('usuario.createdBy', 'createdBy')
                .addSelect(['createdBy.id'])
                .where('empresa.id = :empresaId', { empresaId });
 
@@ -278,7 +316,6 @@ export class UsersService {
 
           return queryBase.getMany();
      }
-
 
      async findAll(superadmin: Usuario) {
           return await this.usuarioRepository.find({
