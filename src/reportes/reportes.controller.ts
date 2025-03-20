@@ -19,4 +19,18 @@ export class ReportesController {
             level ? Number(level) : undefined,
         );
     }
+
+    @Get('balance-general/:empresaId')
+    async getBalanceGeneral(
+        @Param('empresaId') empresaId: number,
+        @Query('endDate') endDate?: string,
+        @Query('level') level?: number,
+    ) {
+
+        return this.reportsService.getBalanceGeneral(
+            empresaId,
+            endDate ? new Date(endDate) : undefined,
+            level ? Number(level) : undefined,
+        );
+    }
 }

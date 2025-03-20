@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { AccountingPlan } from 'src/accounting-plan/entities/accounting-plan.entity';
 import { AsientoItem } from 'src/asiento/entities/asiento-item.entity';
 import { Asiento } from 'src/asiento/entities/asiento.entity';
-import { Between, Repository } from 'typeorm';
+import { Between, LessThanOrEqual, Repository } from 'typeorm';
 
 @Injectable()
 export class ReportesService {
@@ -242,4 +242,208 @@ export class ReportesService {
             level: level || 'All',
         };
     }
+
+    async getBalanceGeneral(
+        empresaId: number,
+        endDate?: Date,
+        level?: number | 'All'
+    ) {
+        // Definir fecha de corte
+        const toDate = endDate || new Date();
+        const formatDate = (date: Date) => date.toISOString().split('T')[0];
+        const formatToDate = formatDate(toDate);
+    
+        // Obtener todas las cuentas de la empresa
+        const accountPlans = await this.accountPlanRepository.find({
+            where: { empresa_id: empresaId },
+            order: { code: 'ASC' },
+        });
+    
+        // Filtrar cuentas por Activos, Pasivos y Patrimonio
+        const filteredAccounts = accountPlans.filter(account =>
+            account.code.startsWith('1') || account.code.startsWith('2') || account.code.startsWith('3')
+        );
+    
+        // Obtener los asientos contables hasta la fecha seleccionada
+        const entries = await this.accountingEntryRepository.find({
+            where: {
+                empresa_id: empresaId,
+                fecha_emision: LessThanOrEqual(new Date(formatToDate)),
+            },
+            relations: ['lineItems'],
+        });
+    
+        // Mapa de valores para cada cuenta (Debe y Haber)
+        const accountValues: Record<string, { debe: number; haber: number }> = {};
+    
+        // Inicializar cuentas con valores en 0
+        filteredAccounts.forEach(account => {
+            accountValues[account.code] = { debe: 0, haber: 0 };
+        });
+    
+        // Procesar los asientos contables
+        entries.forEach(entry => {
+            entry.lineItems.forEach(item => {
+                const accountCode = item.cta;
+                if (accountValues[accountCode]) {
+                    accountValues[accountCode].debe += Number(item.debe) || 0;
+                    accountValues[accountCode].haber += Number(item.haber) || 0;
+                }
+            });
+        });
+    
+        // Mapa de jerarquía de cuentas
+        const accountHierarchy: Record<string, any> = {};
+        filteredAccounts.forEach(account => {
+            accountHierarchy[account.code] = {
+                code: account.code,
+                name: account.name,
+                children: [],
+                parent: null,
+                level: account.code.split('.').filter(Boolean).length,
+                isAsset: account.code.startsWith('1'),
+                isLiability: account.code.startsWith('2'),
+                isEquity: account.code.startsWith('3'),
+                canHaveChildren: account.code.endsWith('.'),
+            };
+        });
+    
+        // Establecer relaciones padre-hijo
+        filteredAccounts.forEach(account => {
+            const code = account.code;
+            const parts = code.split('.').filter(Boolean);
+    
+            if (parts.length > 1) {
+                const parentCode = parts.slice(0, -1).join('.') + '.';
+                if (accountHierarchy[parentCode] && accountHierarchy[parentCode].canHaveChildren) {
+                    accountHierarchy[parentCode].children.push(code);
+                    accountHierarchy[code].parent = parentCode;
+                }
+            }
+        });
+    
+        // Función para calcular el saldo total de una cuenta
+        const calculateAccountBalance = (accountCode: string) => {
+            const account = accountHierarchy[accountCode];
+            if (!account) return { debe: 0, haber: 0 };
+    
+            let { debe, haber } = accountValues[accountCode] || { debe: 0, haber: 0 };
+    
+            if (account.canHaveChildren) {
+                account.children.forEach(childCode => {
+                    const childBalance = calculateAccountBalance(childCode);
+                    debe += childBalance.debe;
+                    haber += childBalance.haber;
+                });
+            }
+    
+            return { debe, haber };
+        };
+    
+        // Función para determinar si una cuenta es un "header" según el nivel
+        const isHeaderAccount = (accountCode: string, targetLevel: number | 'All') => {
+            const account = accountHierarchy[accountCode];
+            if (!account) return false;
+    
+            if (targetLevel === 'All') {
+                // En nivel "All", todas las cuentas que tienen hijos son "headers"
+                return account.canHaveChildren;
+            } else {
+                // En niveles específicos, solo las cuentas padres son "headers"
+                return account.canHaveChildren && account.level < targetLevel;
+            }
+        };
+    
+        // Obtener cuentas según nivel
+        const getAccountsByLevel = (targetLevel: number | 'All') => {
+            const accounts = [];
+            const processedCodes = new Set(); // Para evitar duplicados
+    
+            const traverse = (accountCode: string) => {
+                const account = accountHierarchy[accountCode];
+                if (!account) return;
+    
+                if (targetLevel === 'All' || account.level <= targetLevel) {
+                    // Solo incluir si no hay un padre que ya esté incluido en el reporte
+                    if (!processedCodes.has(accountCode)) {
+                        accounts.push(accountCode);
+                        processedCodes.add(accountCode);
+                    }
+                }
+    
+                if (targetLevel === 'All' || targetLevel > account.level) {
+                    account.children.forEach(childCode => {
+                        // Si incluimos al padre, no incluimos a los hijos para evitar duplicación
+                        if (targetLevel !== 'All' && account.level === targetLevel) {
+                            return;
+                        }
+                        traverse(childCode);
+                    });
+                }
+            };
+    
+            traverse('1.');
+            traverse('2.');
+            traverse('3.');
+    
+            return accounts;
+        };
+    
+        // Obtener cuentas a incluir en el reporte
+        const accountsToInclude = getAccountsByLevel(level || 'All');
+    
+        // Construcción del reporte
+        const report = accountsToInclude.map(accountCode => {
+            const account = accountHierarchy[accountCode];
+            const balance = calculateAccountBalance(accountCode);
+    
+            // Calcular el valor de la cuenta según su tipo (Activo, Pasivo o Patrimonio)
+            let value;
+            if (account.isAsset) {
+                value = balance.debe - balance.haber; // Activos: Debe - Haber
+            } else if (account.isLiability || account.isEquity) {
+                value = balance.haber - balance.debe; // Pasivos y Patrimonio: Haber - Debe
+            } else {
+                value = 0; // Por defecto, en caso de que no coincida con ninguna categoría
+            }
+    
+            // Determinar si la cuenta es un "header" según el nivel
+            const isHeader = isHeaderAccount(accountCode, level || 'All');
+    
+            return {
+                code: accountCode,
+                name: account.name,
+                level: account.level,
+                total: value,
+                isHeader: isHeader,
+            };
+        });
+    
+        // Ordenar reporte por código
+        report.sort((a, b) => a.code.localeCompare(b.code));
+    
+        // Calcular totales solo con las cuentas principales (1., 2., 3.)
+        const totalAssets = calculateAccountBalance('1.').debe - calculateAccountBalance('1.').haber;
+        const totalLiabilities = calculateAccountBalance('2.').haber - calculateAccountBalance('2.').debe;
+        const totalEquity = calculateAccountBalance('3.').haber - calculateAccountBalance('3.').debe;
+    
+        // Agregar líneas de resumen al reporte
+        report.push(
+            { code: 'TOTALACT', name: 'TOTAL ACTIVOS', level: 0, total: totalAssets, isHeader: true },
+            { code: 'TOTALPAS', name: 'TOTAL PASIVOS', level: 0, total: totalLiabilities, isHeader: true },
+            { code: 'TOTALPAT', name: 'TOTAL PATRIMONIO', level: 0, total: totalEquity, isHeader: true },
+            { code: 'TOTALPYP', name: 'TOTAL PASIVOS + PATRIMONIO', level: 0, total: totalLiabilities + totalEquity, isHeader: true }
+        );
+    
+        // Verificación de ecuación contable
+        const balanceCorrecto = Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 0.01; // Permitir pequeña diferencia por redondeo
+    
+        return {
+            report,
+            endDate: formatToDate,
+            level: level || 'All',
+            balanceCorrecto,
+        };
+    }
+    
 }
