@@ -25,35 +25,45 @@ export class AsientoController {
 
   @Get()
   async findAllWithLineItems(@Query('empresa_id') empresa_id: number): Promise<Asiento[]> {
-    return await this.asientoService.findAllWithLineItems(empresa_id);
-  }
-  
-
-  @Post()
-  async createAsiento( 
-    @Body() createAsientoDto: CreateAsientoDto,
-  ) {
     try {
-      const newAsiento = await this.asientoService.createAsientoWithItems(createAsientoDto);
-      return {
-        message: 'Asiento creado exitosamente',
-        data: newAsiento,
-      };
+      return await this.asientoService.findAllWithLineItems(empresa_id);
     } catch (error) {
       throw new HttpException(
-        { message: 'Error al crear el asiento', error: error.message },
+        { message: 'Error al obtener los asientos', error: error.message },
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
-  
+
+  @Post()
+async createAsiento(@Body() createAsientoDto: CreateAsientoDto) {
+  try {
+    const newAsiento = await this.asientoService.createAsientoWithItems(createAsientoDto);
+    return {
+      message: 'Asiento creado exitosamente',
+      data: newAsiento,
+    };
+  } catch (error) {
+    throw new HttpException(
+      { message: error.message || 'Error al crear el asiento' },
+      HttpStatus.CONFLICT, // Usa 409 Conflict para errores de duplicación
+    );
+  } 
+}
 
   @Get(':id')
   async getAsiento(
     @Param('id', ParseIntPipe) id: number,
     @Query('empresa_id', ParseIntPipe) empresaId: number,
   ): Promise<Asiento> {
-    return this.asientoService.findOneWithItems(id, empresaId);
+    try {
+      return await this.asientoService.findOneWithItems(id, empresaId);
+    } catch (error) {
+      throw new HttpException(
+        { message: 'Error al obtener el asiento', error: error.message },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   @Put(':id')
@@ -75,7 +85,6 @@ export class AsientoController {
       );
     }
   }
-  
 
   @Delete(':id')
   async deleteAsiento(
@@ -92,5 +101,4 @@ export class AsientoController {
       );
     }
   }
-  
 }

@@ -32,14 +32,14 @@ export class EmpresaService {
         }
 
         return empresa;
-    }
+    } 
 
     async findAllByCreator(creatorId: number): Promise<Empresa[]> {
         return this.empresaRepository.find({
             where: { createdBy: { id: creatorId } },
             relations: ['usuarios', 'usuarios.usuario']
         });
-    }
+    } 
 
     async findAllByUser(userId: number): Promise<Empresa[]> {
         return this.empresaRepository
