@@ -32,7 +32,7 @@
     "@nestjs/jwt": "^10.2.0",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^10.4.15",
-    "@nestjs/serve-static": "^4.0.2",
+    "@nestjs/serve-static": "^5.0.3",
     "@nestjs/swagger": "^7.4.2",
     "@nestjs/typeorm": "^10.0.2",
     "bcrypt": "^5.1.1",
@@ -47,6 +47,7 @@
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
     "typeorm": "^0.3.20",
+    "ua-parser-js": "^2.0.3",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
