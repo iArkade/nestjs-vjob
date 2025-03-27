@@ -13,6 +13,7 @@ import { EmpresaModule } from './empresa/empresa.module';
 import { UsuarioEmpresa } from './usuario_empresa/entities/usuario_empresa.entity';
 import { Permisos } from './permisos/entities/permisos.entity';
 import { ReportesModule } from './reportes/reportes.module';
+import { LoginHistoryModule } from './login-history/login-history.module';
 
 @Module({
   imports: [
@@ -29,7 +30,8 @@ import { ReportesModule } from './reportes/reportes.module';
     EmpresaModule,
     UsuarioEmpresa,
     Permisos,
-    ReportesModule
+    ReportesModule,
+    LoginHistoryModule
   ],
   controllers: [AppController],
   providers: [AppService],

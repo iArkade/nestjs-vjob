@@ -42,6 +42,17 @@ export class UsersController {
           return await this.usersService.updateByEmpresa(empresaId, userId, updateUserDto, req.user);
      }
 
+     @Delete('empresa/:empresaId/:userId')
+     @UseGuards(JwtAuthGuard)
+     async deleteByEmpresa(
+          @Param('empresaId', ParseIntPipe) empresaId: number,
+          @Param('userId', ParseIntPipe) userId: number,
+          @Request() req
+     ) {
+          return await this.usersService.deleteByEmpresa(empresaId, userId, req.user);
+     }
+
+
      @Get()
      @UseGuards(JwtAuthGuard, RoleGuard)
      @Roles(SystemRole.SUPERADMIN)
