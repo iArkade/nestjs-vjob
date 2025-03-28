@@ -25,7 +25,7 @@ export class ReportesController {
         @Param('empresaId') empresaId: number,
         @Query('endDate') endDate?: string,
         @Query('level') level?: number,
-    ) {
+    ) {        
 
         return this.reportsService.getBalanceGeneral(
             empresaId,
