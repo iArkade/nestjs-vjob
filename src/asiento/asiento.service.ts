@@ -5,16 +5,20 @@ import { Asiento } from "./entities/asiento.entity";
 import { AsientoItem } from "./entities/asiento-item.entity";
 import { Repository } from "typeorm";
 import { UpdateAsientoDto } from "./dto/update-asiento.dto";
+import { TransaccionContable } from "src/transaccion-contable/entities/transaccion-contable.entity";
 
 @Injectable()
 export class AsientoService {
   constructor(
+    @InjectRepository(TransaccionContable)
+    private transactionRepository: Repository<TransaccionContable>,
+
     @InjectRepository(Asiento)
     private asientoRepository: Repository<Asiento>,
 
     @InjectRepository(AsientoItem)
     private asientoItemRepository: Repository<AsientoItem>,
-  ) {}
+  ) { }
 
   async findAllWithLineItems(empresa_id: number): Promise<Asiento[]> {
     try {
@@ -31,35 +35,41 @@ export class AsientoService {
   async createAsientoWithItems(createAsientoDto: CreateAsientoDto) {
     try {
       const { codigo_transaccion, empresa_id } = createAsientoDto;
-  
-      // Verificar si ya existe un asiento con el mismo código de transacción y empresa
-      const existingAsiento = await this.asientoRepository.findOne({
-        where: { codigo_transaccion, empresa_id },
+
+      // Buscar la transacción por empresa y código
+      const transaccion = await this.transactionRepository.findOne({
+        where: { empresa_id, codigo_transaccion },
       });
-  
-      if (existingAsiento) {
-        throw new Error(
-          `Ya existe un asiento con el código de transacción ${codigo_transaccion} para esta empresa.`
-        );
+
+      if (!transaccion) {
+        throw new Error(`No se encontró la transacción con código ${codigo_transaccion}`);
       }
-  
+
+      // Incrementar secuencial
+      const ultimoSecuencial = parseInt(transaccion.secuencial || '0');
+      const nuevoSecuencial = (ultimoSecuencial + 1).toString().padStart(9, '0');
+
+      // Guardar nuevo secuencial en la tabla
+      transaccion.secuencial = nuevoSecuencial;
+      await this.transactionRepository.save(transaccion);
+
       const { lineItems, fecha_emision, ...asientoData } = createAsientoDto;
       const fechaEmisionFinal = fecha_emision || new Date();
-  
+
       const asiento = this.asientoRepository.create({
         ...asientoData,
         fecha_emision: fechaEmisionFinal,
       });
-  
+
       const savedAsiento = await this.asientoRepository.save(asiento);
-  
+
       const asientoItems = lineItems.map((item) => {
         return this.asientoItemRepository.create({
           ...item,
           asiento: savedAsiento,
         });
       });
-  
+
       await this.asientoItemRepository.save(asientoItems);
       return savedAsiento;
     } catch (error) {

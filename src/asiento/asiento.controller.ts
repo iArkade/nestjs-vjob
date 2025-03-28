@@ -36,20 +36,20 @@ export class AsientoController {
   }
 
   @Post()
-async createAsiento(@Body() createAsientoDto: CreateAsientoDto) {
-  try {
-    const newAsiento = await this.asientoService.createAsientoWithItems(createAsientoDto);
-    return {
-      message: 'Asiento creado exitosamente',
-      data: newAsiento,
-    };
-  } catch (error) {
-    throw new HttpException(
-      { message: error.message || 'Error al crear el asiento' },
-      HttpStatus.CONFLICT, // Usa 409 Conflict para errores de duplicación
-    );
-  } 
-}
+  async createAsiento(@Body() createAsientoDto: CreateAsientoDto) {
+    try {
+      const newAsiento = await this.asientoService.createAsientoWithItems(createAsientoDto);
+      return {
+        message: 'Asiento creado exitosamente',
+        data: newAsiento,
+      };
+    } catch (error) {
+      throw new HttpException(
+        { message: error.message || 'Error al crear el asiento' },
+        HttpStatus.CONFLICT, // Usa 409 Conflict para errores de duplicación
+      );
+    } 
+  }
 
   @Get(':id')
   async getAsiento(
