@@ -33,4 +33,19 @@ export class ReportesController {
             level ? Number(level) : undefined,
         );
     }
+
+    @Get('libro-diario/:empresaId')
+    async getLibroDiario(
+        @Param('empresaId') empresaId: number,
+        @Query('fechaDesde') fechaDesde?: string,
+        @Query('fechaHasta') fechaHasta?: string,
+        @Query('codigoTransaccion') codigoTransaccion?: string,
+    ) {
+        return this.reportsService.getLibroDiario(
+            empresaId,
+            fechaDesde ? new Date(fechaDesde) : undefined,
+            fechaHasta ? new Date(fechaHasta) : undefined,
+            codigoTransaccion,
+        );
+    }
 }
