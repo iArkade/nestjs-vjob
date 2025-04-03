@@ -578,5 +578,4 @@ export class ReportesService {
         return date.toISOString().split('T')[0];
     }
     
-
 }
