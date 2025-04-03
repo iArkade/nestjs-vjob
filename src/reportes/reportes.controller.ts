@@ -25,12 +25,32 @@ export class ReportesController {
         @Param('empresaId') empresaId: number,
         @Query('endDate') endDate?: string,
         @Query('level') level?: number,
-    ) {        
+    ) {
 
         return this.reportsService.getBalanceGeneral(
             empresaId,
             endDate ? new Date(endDate) : undefined,
             level ? Number(level) : undefined,
+        );
+    }
+
+    @Get('mayor-general/:empresaId')
+    async getMayorGeneral(
+        @Param('empresaId') empresaId: number,
+        @Query('initialAccount') initialAccount?: string,
+        @Query('finalAccount') finalAccount?: string,
+        @Query('startDate') startDate?: string,
+        @Query('endDate') endDate?: string,
+        @Query('transaction') transaction?: string,
+    ) {
+        
+        return this.reportsService.getMayorGeneral(
+            empresaId,
+            initialAccount,
+            finalAccount,
+            startDate ? new Date(startDate) : undefined,
+            endDate ? new Date(endDate) : undefined,
+            transaction,
         );
     }
 
