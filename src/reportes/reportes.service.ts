@@ -481,7 +481,7 @@ export class ReportesService {
             report.push(
                 { code: 'TOTALPYP', name: 'TOTAL PASIVOS + PATRIMONIO', level: 0, total: totalLiabilities + totalEquity, isHeader: true },
                 { code: 'NET', name: 'UTILIDAD O PÉRDIDA', level: 0, total: totalAssets - totalLiabilities - totalEquity, isHeader: true },
-                { code: 'TOTALPYPNET', name: 'TOTAL PASIVOS + PATRIMONIO + NET', level: 0, total: (totalLiabilities + totalEquity)+(totalAssets - totalLiabilities - totalEquity), isHeader: true }
+                { code: 'TOTALPYPNET', name: 'TOTAL PASIVOS + PATRIMONIO + NET', level: 0, total: (totalLiabilities + totalEquity) + (totalAssets - totalLiabilities - totalEquity), isHeader: true }
             );
         }
 
@@ -506,24 +506,24 @@ export class ReportesService {
         if (!fechaDesde || !fechaHasta) {
             throw new Error('Debe proporcionar fechas de inicio y fin');
         }
-    
+
         // Ajustar fechas
         const fromDate = new Date(fechaDesde);
         fromDate.setUTCHours(0, 0, 0, 0);
-        
+
         const toDate = new Date(fechaHasta);
         toDate.setUTCHours(23, 59, 59, 999);
-    
+
         // Crear condiciones de búsqueda
         const where: any = {
             empresa_id: empresaId,
             fecha_emision: Between(fromDate, toDate),
         };
-    
+
         if (codigoTransaccion) {
             where.codigo_transaccion = Like(`%${codigoTransaccion}%`);
         }
-    
+
         // Obtener asientos
         const asientos = await this.accountingEntryRepository.find({
             where,
@@ -533,7 +533,7 @@ export class ReportesService {
                 nro_asiento: 'ASC',
             },
         });
-    
+
         // Formatear respuesta
         const asientosFormateados = asientos.map(asiento => {
             const items = asiento.lineItems.map(item => ({
@@ -544,7 +544,7 @@ export class ReportesService {
                 haber: typeof item.haber === 'string' ? parseFloat(item.haber) : Number(item.haber) || 0,
                 nota: item.nota || '',
             }));
-    
+
             return {
                 id: asiento.id,
                 fecha_emision: asiento.fecha_emision,
@@ -557,12 +557,12 @@ export class ReportesService {
                 items,
             };
         });
-    
+
         // Calcular totales generales
         const totalDebe = asientosFormateados.reduce((sum, asiento) => sum + asiento.total_debe, 0);
         const totalHaber = asientosFormateados.reduce((sum, asiento) => sum + asiento.total_haber, 0);
         const totalDiferencia = Math.abs(totalDebe - totalHaber);
-    
+
         return {
             asientos: asientosFormateados,
             fechaDesde: this.formatDateToISO(fromDate),
@@ -573,11 +573,11 @@ export class ReportesService {
             totalDiferencia,
         };
     }
-    
+
     private formatDateToISO(date: Date): string {
         return date.toISOString().split('T')[0];
     }
-    
+
     async getMayorGeneral(
         empresaId: number,
         initialAccount?: string,
@@ -586,6 +586,7 @@ export class ReportesService {
         endDate?: Date,
         transaction?: string,
     ) {
+
         // Obtener saldo anterior agrupado por cuenta
         const saldoAnteriorPorCuenta = await this.obtenerSaldosAnteriores(
             empresaId,
@@ -600,12 +601,19 @@ export class ReportesService {
             .innerJoinAndSelect('item.asiento', 'asiento')
             .where('asiento.empresa_id = :empresaId', { empresaId });
 
+
         if (startDate) {
-            query.andWhere('asiento.fecha_emision >= :startDate', { startDate });
+            const formattedStartDate = startDate.toISOString().split('T')[0];
+            query.andWhere('asiento.fecha_emision >= :startDate', {
+                startDate: formattedStartDate
+            });
         }
 
         if (endDate) {
-            query.andWhere('asiento.fecha_emision <= :endDate', { endDate });
+            const formattedEndDate = endDate.toISOString().split('T')[0];
+            query.andWhere('asiento.fecha_emision <= :endDate', {
+                endDate: formattedEndDate
+            });
         }
 
         if (initialAccount && finalAccount) {
@@ -627,6 +635,19 @@ export class ReportesService {
             .addOrderBy('asiento.nro_asiento', 'ASC')
             .getMany();
 
+        // console.log('Resultados de la consulta:', {
+        //     parameters: {
+        //         empresaId,
+        //         initialAccount,
+        //         finalAccount,
+        //         startDate: startDate?.toISOString(),
+        //         endDate: endDate?.toISOString(),
+        //         transaction
+        //     },
+        //     itemsCount: items.length,
+        //     firstItems: items.slice(0, 4)
+        // });
+
         return this.groupByCuenta(items, saldoAnteriorPorCuenta);
     }
 
@@ -636,16 +657,19 @@ export class ReportesService {
         initialAccount?: string,
         finalAccount?: string,
     ): Promise<Record<string, number>> {
+
         if (!startDate) return {};
 
         const query = this.accountingEntryItemRepository
             .createQueryBuilder('item')
             .innerJoin('item.asiento', 'asiento')
-            .select('item.cta', 'cta')
+            .select('item.cta', 'cuenta')
             .addSelect('SUM(item.debe)', 'totalDebe')
             .addSelect('SUM(item.haber)', 'totalHaber')
             .where('asiento.empresa_id = :empresaId', { empresaId })
-            .andWhere('asiento.fecha_emision < :startDate', { startDate });
+            .andWhere('asiento.fecha_emision < :startDate', {
+                startDate: startDate.toISOString().split('T')[0] // Formato YYYY-MM-DD
+            });
 
         if (initialAccount && finalAccount) {
             query.andWhere('item.cta BETWEEN :initialAccount AND :finalAccount', {
@@ -660,12 +684,11 @@ export class ReportesService {
 
         const saldos: Record<string, number> = {};
         for (const row of resultados) {
-            const cuenta = row.cta;
+            const cuenta = row.cuenta;
             const debe = parseFloat(row.totalDebe || 0);
             const haber = parseFloat(row.totalHaber || 0);
             saldos[cuenta] = debe - haber;
         }
-
         return saldos;
     }
 
@@ -712,5 +735,4 @@ export class ReportesService {
 
         return Object.values(resultado); // Devuelve array de cuentas con sus movimientos
     }
-    
 }
