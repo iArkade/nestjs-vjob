@@ -578,5 +578,139 @@ export class ReportesService {
         return date.toISOString().split('T')[0];
     }
     
+    async getMayorGeneral(
+        empresaId: number,
+        initialAccount?: string,
+        finalAccount?: string,
+        startDate?: Date,
+        endDate?: Date,
+        transaction?: string,
+    ) {
+        // Obtener saldo anterior agrupado por cuenta
+        const saldoAnteriorPorCuenta = await this.obtenerSaldosAnteriores(
+            empresaId,
+            startDate,
+            initialAccount,
+            finalAccount,
+        );
+
+        // Obtener los movimientos dentro del rango
+        const query = this.accountingEntryItemRepository
+            .createQueryBuilder('item')
+            .innerJoinAndSelect('item.asiento', 'asiento')
+            .where('asiento.empresa_id = :empresaId', { empresaId });
+
+        if (startDate) {
+            query.andWhere('asiento.fecha_emision >= :startDate', { startDate });
+        }
+
+        if (endDate) {
+            query.andWhere('asiento.fecha_emision <= :endDate', { endDate });
+        }
+
+        if (initialAccount && finalAccount) {
+            query.andWhere('item.cta BETWEEN :initialAccount AND :finalAccount', {
+                initialAccount,
+                finalAccount,
+            });
+        }
+
+        if (transaction) {
+            query.andWhere('asiento.codigo_transaccion = :transaction', {
+                transaction,
+            });
+        }
+
+        const items = await query
+            .orderBy('item.cta', 'ASC')
+            .addOrderBy('asiento.fecha_emision', 'ASC')
+            .addOrderBy('asiento.nro_asiento', 'ASC')
+            .getMany();
+
+        return this.groupByCuenta(items, saldoAnteriorPorCuenta);
+    }
+
+    private async obtenerSaldosAnteriores(
+        empresaId: number,
+        startDate?: Date,
+        initialAccount?: string,
+        finalAccount?: string,
+    ): Promise<Record<string, number>> {
+        if (!startDate) return {};
+
+        const query = this.accountingEntryItemRepository
+            .createQueryBuilder('item')
+            .innerJoin('item.asiento', 'asiento')
+            .select('item.cta', 'cta')
+            .addSelect('SUM(item.debe)', 'totalDebe')
+            .addSelect('SUM(item.haber)', 'totalHaber')
+            .where('asiento.empresa_id = :empresaId', { empresaId })
+            .andWhere('asiento.fecha_emision < :startDate', { startDate });
+
+        if (initialAccount && finalAccount) {
+            query.andWhere('item.cta BETWEEN :initialAccount AND :finalAccount', {
+                initialAccount,
+                finalAccount,
+            });
+        }
+
+        query.groupBy('item.cta');
+
+        const resultados = await query.getRawMany();
+
+        const saldos: Record<string, number> = {};
+        for (const row of resultados) {
+            const cuenta = row.cta;
+            const debe = parseFloat(row.totalDebe || 0);
+            const haber = parseFloat(row.totalHaber || 0);
+            saldos[cuenta] = debe - haber;
+        }
+
+        return saldos;
+    }
+
+    private groupByCuenta(
+        items: AsientoItem[],
+        saldoAnteriorPorCuenta: Record<string, number> = {},
+    ) {
+        const resultado = {};
+
+        for (const item of items) {
+            const cuentaClave = `${item.cta} ${item.cta_nombre}`;
+            if (!resultado[cuentaClave]) {
+                const saldoInicial = saldoAnteriorPorCuenta[item.cta] || 0;
+                resultado[cuentaClave] = {
+                    cuenta: cuentaClave,
+                    movimientos: [],
+                    saldoInicial,
+                };
+            }
+
+            const asiento = item.asiento;
+            const movimiento = {
+                fecha: asiento.fecha_emision,
+                nro_asiento: asiento.nro_asiento,
+                descripcion: asiento.comentario,
+                nota: item.nota,
+                debe: Number(item.debe),
+                haber: Number(item.haber),
+            };
+
+            resultado[cuentaClave].movimientos.push(movimiento);
+        }
+
+        // Calcular saldo acumulado
+        for (const cuenta in resultado) {
+            let saldo = resultado[cuenta].saldoInicial;
+            resultado[cuenta].movimientos = resultado[cuenta].movimientos.map(
+                (m) => {
+                    saldo += m.debe - m.haber;
+                    return { ...m, saldo };
+                },
+            );
+        }
+
+        return Object.values(resultado); // Devuelve array de cuentas con sus movimientos
+    }
     
 }
