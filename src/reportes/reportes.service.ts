@@ -601,18 +601,15 @@ export class ReportesService {
             .innerJoinAndSelect('item.asiento', 'asiento')
             .where('asiento.empresa_id = :empresaId', { empresaId });
 
-
         if (startDate) {
-            const formattedStartDate = startDate.toISOString().split('T')[0];
             query.andWhere('asiento.fecha_emision >= :startDate', {
-                startDate: formattedStartDate
+                startDate: this.formatDateToISO(startDate)
             });
         }
 
         if (endDate) {
-            const formattedEndDate = endDate.toISOString().split('T')[0];
             query.andWhere('asiento.fecha_emision <= :endDate', {
-                endDate: formattedEndDate
+                endDate: this.formatDateToISO(endDate)
             });
         }
 
@@ -668,7 +665,7 @@ export class ReportesService {
             .addSelect('SUM(item.haber)', 'totalHaber')
             .where('asiento.empresa_id = :empresaId', { empresaId })
             .andWhere('asiento.fecha_emision < :startDate', {
-                startDate: startDate.toISOString().split('T')[0] // Formato YYYY-MM-DD
+                startDate: this.formatDateToISO(startDate)
             });
 
         if (initialAccount && finalAccount) {
