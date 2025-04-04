@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { AccountingPlan } from 'src/accounting-plan/entities/accounting-plan.entity';
 import { AsientoItem } from 'src/asiento/entities/asiento-item.entity';
 import { Asiento } from 'src/asiento/entities/asiento.entity';
-import { Between, LessThanOrEqual, Like, Repository } from 'typeorm';
+import { Between, LessThan, LessThanOrEqual, Like, Repository } from 'typeorm';
 
 @Injectable()
 export class ReportesService {
@@ -732,4 +732,203 @@ export class ReportesService {
 
         return Object.values(resultado); // Devuelve array de cuentas con sus movimientos
     }
+
+    async getBalanceComprobacion(
+        empresaId: number,
+        startDate?: Date,
+        endDate?: Date,
+        initialAccount?: string,
+        finalAccount?: string,
+        level?: number
+    ) {
+        // Validar fechas
+        if (!startDate || !endDate) {
+            throw new BadRequestException('Debe proporcionar fechas de inicio y fin');
+        }
+    
+        // Ajustar fechas para incluir todo el día
+        const fromDate = new Date(startDate);
+        fromDate.setUTCHours(0, 0, 0, 0);
+        
+        const toDate = new Date(endDate);
+        toDate.setUTCHours(23, 59, 59, 999);
+    
+        const formatDate = (date: Date) => date.toISOString().split('T')[0];
+        const formatFromDate = formatDate(fromDate);
+        const formatToDate = formatDate(toDate);
+    
+        // Obtener todas las cuentas del plan contable
+        const accountPlans = await this.accountPlanRepository.find({
+            where: { empresa_id: empresaId },
+            order: { code: 'ASC' },
+        });
+    
+        // Filtrar cuentas por rango si se especifica
+        let filteredAccounts = accountPlans;
+        if (initialAccount && finalAccount) {
+            filteredAccounts = accountPlans.filter(account => 
+                account.code >= initialAccount && account.code <= finalAccount
+            );
+        }
+    
+        // Filtrar por nivel si se especifica
+        if (level) {
+            filteredAccounts = filteredAccounts.filter(account => 
+                account.code.split('.').filter(Boolean).length <= level
+            );
+        }
+    
+        // 1. Obtener SALDO ANTERIOR (suma de todos los movimientos hasta 1 día antes de startDate)
+        const saldoAnteriorEntries = await this.accountingEntryRepository.find({
+            where: {
+                empresa_id: empresaId,
+                fecha_emision: LessThan(fromDate),
+            },
+            relations: ['lineItems'],
+        });
+
+        //console.log(saldoAnteriorEntries);
+        
+    
+        // 2. Obtener MOVIMIENTOS (transacciones entre las fechas seleccionadas)
+        const movimientosEntries = await this.accountingEntryRepository.find({
+            where: {
+                empresa_id: empresaId,
+                fecha_emision: Between(fromDate, toDate),
+            },
+            relations: ['lineItems'],
+        });
+    
+        // Inicializar estructura para almacenar valores
+        const accountValues: Record<string, {
+            saldoAnteriorDebe: number;
+            saldoAnteriorHaber: number;
+            movimientosDebe: number;
+            movimientosHaber: number;
+            tipoCuenta: 'activo' | 'pasivo' | 'patrimonio' | 'ingreso' | 'gasto';
+        }> = {};
+    
+        // Clasificar cuentas y inicializar valores
+        filteredAccounts.forEach(account => {
+            const tipo = this.clasificarTipoCuenta(account.code);
+            accountValues[account.code] = {
+                saldoAnteriorDebe: 0,
+                saldoAnteriorHaber: 0,
+                movimientosDebe: 0,
+                movimientosHaber: 0,
+                tipoCuenta: tipo
+            };
+        });
+    
+        console.log(accountValues);
+        
+        // Procesar SALDO ANTERIOR
+        saldoAnteriorEntries.forEach(entry => {
+            entry.lineItems.forEach(item => {
+                if (accountValues[item.cta]) {
+                    accountValues[item.cta].saldoAnteriorDebe += Number(item.debe) || 0;
+                    accountValues[item.cta].saldoAnteriorHaber += Number(item.haber) || 0;
+                }
+            });
+        });
+    
+        // Procesar MOVIMIENTOS
+        movimientosEntries.forEach(entry => {
+            entry.lineItems.forEach(item => {
+                if (accountValues[item.cta]) {
+                    accountValues[item.cta].movimientosDebe += Number(item.debe) || 0;
+                    accountValues[item.cta].movimientosHaber += Number(item.haber) || 0;
+                }
+            });
+        });
+    
+        // Calcular SALDOS según tipo de cuenta
+        const reportItems = [];
+        let totalSaldoAnteriorDebe = 0;
+        let totalSaldoAnteriorHaber = 0;
+        let totalMovimientosDebe = 0;
+        let totalMovimientosHaber = 0;
+        let totalSaldosDebe = 0;
+        let totalSaldosHaber = 0;
+    
+        filteredAccounts.forEach(account => {
+            const values = accountValues[account.code];
+            const tipo = values.tipoCuenta;
+    
+            // Calcular saldos según tipo de cuenta
+            let saldoDebe = 0;
+            let saldoHaber = 0;
+            
+            if (tipo === 'activo' || tipo === 'gasto') {
+                // Para activos y gastos: (saldo anterior - haber + debe)
+                const saldoAnterior = values.saldoAnteriorDebe - values.saldoAnteriorHaber;
+                const saldoMovimientos = -values.movimientosHaber + values.movimientosDebe;
+                const saldoFinal = saldoAnterior + saldoMovimientos;
+                
+                if (saldoFinal > 0) {
+                    saldoDebe = saldoFinal;
+                } else {
+                    saldoHaber = Math.abs(saldoFinal);
+                }
+            } else { // pasivo, patrimonio, ingreso
+                // Para pasivos, patrimonio e ingresos: (saldo anterior + haber - debe)
+                const saldoAnterior = values.saldoAnteriorHaber - values.saldoAnteriorDebe;
+                const saldoMovimientos = values.movimientosHaber - values.movimientosDebe;
+                const saldoFinal = saldoAnterior + saldoMovimientos;
+                
+                if (saldoFinal > 0) {
+                    saldoHaber = saldoFinal;
+                } else {
+                    saldoDebe = Math.abs(saldoFinal);
+                }
+            }
+    
+            // Acumular totales
+            totalSaldoAnteriorDebe += values.saldoAnteriorDebe;
+            totalSaldoAnteriorHaber += values.saldoAnteriorHaber;
+            totalMovimientosDebe += values.movimientosDebe;
+            totalMovimientosHaber += values.movimientosHaber;
+            totalSaldosDebe += saldoDebe;
+            totalSaldosHaber += saldoHaber;
+    
+            reportItems.push({
+                codigo: account.code,
+                nombre: account.name,
+                saldoAnteriorDebe: values.saldoAnteriorDebe,
+                saldoAnteriorHaber: values.saldoAnteriorHaber,
+                movimientosDebe: values.movimientosDebe,
+                movimientosHaber: values.movimientosHaber,
+                saldoDebe,
+                saldoHaber,
+                level: account.code.split('.').filter(Boolean).length
+            });
+        });
+    
+        return {
+            report: reportItems,
+            startDate: formatFromDate,
+            endDate: formatToDate,
+            initialAccount,
+            finalAccount,
+            level,
+            totalSaldoAnteriorDebe,
+            totalSaldoAnteriorHaber,
+            totalMovimientosDebe,
+            totalMovimientosHaber,
+            totalSaldosDebe,
+            totalSaldosHaber,
+            diferenciaMovimientos: totalMovimientosDebe - totalMovimientosHaber,
+            diferenciaSaldos: totalSaldosDebe - totalSaldosHaber
+        };
+    }
+    
+    private clasificarTipoCuenta(codigo: string): 'activo' | 'pasivo' | 'patrimonio' | 'ingreso' | 'gasto' {
+        if (codigo.startsWith('1')) return 'activo';
+        if (codigo.startsWith('2')) return 'pasivo';
+        if (codigo.startsWith('3')) return 'patrimonio';
+        if (codigo.startsWith('4')) return 'ingreso';
+        if (codigo.startsWith('5')) return 'gasto';
+        return 'activo'; // Por defecto
+    }
+
 }

@@ -48,7 +48,7 @@ export class ReportesController {
             codigoTransaccion,
         );
     }
-    
+
     @Get('mayor-general/:empresaId')
     async getMayorGeneral(
         @Param('empresaId') empresaId: number,
@@ -58,7 +58,7 @@ export class ReportesController {
         @Query('endDate') endDate?: string,
         @Query('transaction') transaction?: string,
     ) {
-        
+
         return this.reportsService.getMayorGeneral(
             empresaId,
             initialAccount,
@@ -66,6 +66,25 @@ export class ReportesController {
             startDate ? new Date(startDate) : undefined,
             endDate ? new Date(endDate) : undefined,
             transaction,
+        );
+    }
+
+    @Get('balance-comprobacion/:empresaId')
+    async getBalanceComprobacion(
+        @Param('empresaId') empresaId: number,
+        @Query('startDate') startDate?: string,
+        @Query('endDate') endDate?: string,
+        @Query('initialAccount') initialAccount?: string,
+        @Query('finalAccount') finalAccount?: string,
+        @Query('level') level?: number,
+    ) {
+        return this.reportsService.getBalanceComprobacion(
+            empresaId,
+            startDate ? new Date(startDate) : undefined,
+            endDate ? new Date(endDate) : undefined,
+            initialAccount,
+            finalAccount,
+            level ? Number(level) : undefined,
         );
     }
 
