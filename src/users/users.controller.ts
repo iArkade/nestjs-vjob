@@ -28,6 +28,7 @@ export class UsersController {
           @Body() createUserDto: CreateUserDto,
           @Request() req,
      ) {
+          console.log(req.user)
           return this.usersService.createByEmpresa(empresaId, createUserDto, req.user);
      }
 

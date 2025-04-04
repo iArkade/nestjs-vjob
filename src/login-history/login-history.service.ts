@@ -75,3 +75,5 @@ export class LoginHistoryService {
     return { data, total };
   }
 }
+
+

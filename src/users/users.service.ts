@@ -139,6 +139,7 @@ export class UsersService {
      }
 
      async createByEmpresa(empresaId: number, createUserDto: CreateUserDto, currentUser: Usuario) {
+          //console.log(currentUser);
           if (currentUser.systemRole !== SystemRole.SUPERADMIN) {
                const acceso = await this.usuarioEmpresaRepository.findOne({
                     where: {
