@@ -87,6 +87,7 @@ export class AuthService {
                     where: { email }
                });
 
+               //console.log(usuario)
                if (!usuario) {
                     throw new UnauthorizedException('Credenciales inválidas');
                }
