@@ -745,39 +745,39 @@ export class ReportesService {
         if (!startDate || !endDate) {
             throw new BadRequestException('Debe proporcionar fechas de inicio y fin');
         }
-    
+
         // Ajustar fechas para incluir todo el día
         const fromDate = new Date(startDate);
         fromDate.setUTCHours(0, 0, 0, 0);
-        
+
         const toDate = new Date(endDate);
         toDate.setUTCHours(23, 59, 59, 999);
-    
+
         const formatDate = (date: Date) => date.toISOString().split('T')[0];
         const formatFromDate = formatDate(fromDate);
         const formatToDate = formatDate(toDate);
-    
+
         // Obtener todas las cuentas del plan contable
         const accountPlans = await this.accountPlanRepository.find({
             where: { empresa_id: empresaId },
             order: { code: 'ASC' },
         });
-    
+
         // Filtrar cuentas por rango si se especifica
         let filteredAccounts = accountPlans;
         if (initialAccount && finalAccount) {
-            filteredAccounts = accountPlans.filter(account => 
+            filteredAccounts = accountPlans.filter(account =>
                 account.code >= initialAccount && account.code <= finalAccount
             );
         }
-    
+
         // Filtrar por nivel si se especifica
         if (level) {
-            filteredAccounts = filteredAccounts.filter(account => 
+            filteredAccounts = filteredAccounts.filter(account =>
                 account.code.split('.').filter(Boolean).length <= level
             );
         }
-    
+
         // 1. Obtener SALDO ANTERIOR (suma de todos los movimientos hasta 1 día antes de startDate)
         const saldoAnteriorEntries = await this.accountingEntryRepository.find({
             where: {
@@ -788,8 +788,8 @@ export class ReportesService {
         });
 
         //console.log(saldoAnteriorEntries);
-        
-    
+
+
         // 2. Obtener MOVIMIENTOS (transacciones entre las fechas seleccionadas)
         const movimientosEntries = await this.accountingEntryRepository.find({
             where: {
@@ -798,7 +798,7 @@ export class ReportesService {
             },
             relations: ['lineItems'],
         });
-    
+
         // Inicializar estructura para almacenar valores
         const accountValues: Record<string, {
             saldoAnteriorDebe: number;
@@ -807,7 +807,7 @@ export class ReportesService {
             movimientosHaber: number;
             tipoCuenta: 'activo' | 'pasivo' | 'patrimonio' | 'ingreso' | 'gasto';
         }> = {};
-    
+
         // Clasificar cuentas y inicializar valores
         filteredAccounts.forEach(account => {
             const tipo = this.clasificarTipoCuenta(account.code);
@@ -819,9 +819,9 @@ export class ReportesService {
                 tipoCuenta: tipo
             };
         });
-    
+
         console.log(accountValues);
-        
+
         // Procesar SALDO ANTERIOR
         saldoAnteriorEntries.forEach(entry => {
             entry.lineItems.forEach(item => {
@@ -831,7 +831,7 @@ export class ReportesService {
                 }
             });
         });
-    
+
         // Procesar MOVIMIENTOS
         movimientosEntries.forEach(entry => {
             entry.lineItems.forEach(item => {
@@ -841,7 +841,7 @@ export class ReportesService {
                 }
             });
         });
-    
+
         // Calcular SALDOS según tipo de cuenta
         const reportItems = [];
         let totalSaldoAnteriorDebe = 0;
@@ -850,21 +850,21 @@ export class ReportesService {
         let totalMovimientosHaber = 0;
         let totalSaldosDebe = 0;
         let totalSaldosHaber = 0;
-    
+
         filteredAccounts.forEach(account => {
             const values = accountValues[account.code];
             const tipo = values.tipoCuenta;
-    
+
             // Calcular saldos según tipo de cuenta
             let saldoDebe = 0;
             let saldoHaber = 0;
-            
+
             if (tipo === 'activo' || tipo === 'gasto') {
                 // Para activos y gastos: (saldo anterior - haber + debe)
                 const saldoAnterior = values.saldoAnteriorDebe - values.saldoAnteriorHaber;
                 const saldoMovimientos = -values.movimientosHaber + values.movimientosDebe;
                 const saldoFinal = saldoAnterior + saldoMovimientos;
-                
+
                 if (saldoFinal > 0) {
                     saldoDebe = saldoFinal;
                 } else {
@@ -875,35 +875,43 @@ export class ReportesService {
                 const saldoAnterior = values.saldoAnteriorHaber - values.saldoAnteriorDebe;
                 const saldoMovimientos = values.movimientosHaber - values.movimientosDebe;
                 const saldoFinal = saldoAnterior + saldoMovimientos;
-                
+
                 if (saldoFinal > 0) {
                     saldoHaber = saldoFinal;
                 } else {
                     saldoDebe = Math.abs(saldoFinal);
                 }
             }
-    
-            // Acumular totales
-            totalSaldoAnteriorDebe += values.saldoAnteriorDebe;
-            totalSaldoAnteriorHaber += values.saldoAnteriorHaber;
-            totalMovimientosDebe += values.movimientosDebe;
-            totalMovimientosHaber += values.movimientosHaber;
-            totalSaldosDebe += saldoDebe;
-            totalSaldosHaber += saldoHaber;
-    
-            reportItems.push({
-                codigo: account.code,
-                nombre: account.name,
-                saldoAnteriorDebe: values.saldoAnteriorDebe,
-                saldoAnteriorHaber: values.saldoAnteriorHaber,
-                movimientosDebe: values.movimientosDebe,
-                movimientosHaber: values.movimientosHaber,
-                saldoDebe,
-                saldoHaber,
-                level: account.code.split('.').filter(Boolean).length
-            });
+
+            const tieneSaldo = saldoDebe !== 0 || saldoHaber !== 0 ||
+                values.saldoAnteriorDebe !== 0 || values.saldoAnteriorHaber !== 0 ||
+                values.movimientosDebe !== 0 || values.movimientosHaber !== 0;
+
+            if (tieneSaldo) {
+
+                // Acumular totales
+                totalSaldoAnteriorDebe += values.saldoAnteriorDebe;
+                totalSaldoAnteriorHaber += values.saldoAnteriorHaber;
+                totalMovimientosDebe += values.movimientosDebe;
+                totalMovimientosHaber += values.movimientosHaber;
+                totalSaldosDebe += saldoDebe;
+                totalSaldosHaber += saldoHaber;
+
+                reportItems.push({
+                    codigo: account.code,
+                    nombre: account.name,
+                    saldoAnteriorDebe: values.saldoAnteriorDebe,
+                    saldoAnteriorHaber: values.saldoAnteriorHaber,
+                    movimientosDebe: values.movimientosDebe,
+                    movimientosHaber: values.movimientosHaber,
+                    saldoDebe,
+                    saldoHaber,
+                    tipoCuenta: tipo,
+                    level: account.code.split('.').filter(Boolean).length
+                });
+            }
         });
-    
+
         return {
             report: reportItems,
             startDate: formatFromDate,
@@ -921,7 +929,7 @@ export class ReportesService {
             diferenciaSaldos: totalSaldosDebe - totalSaldosHaber
         };
     }
-    
+
     private clasificarTipoCuenta(codigo: string): 'activo' | 'pasivo' | 'patrimonio' | 'ingreso' | 'gasto' {
         if (codigo.startsWith('1')) return 'activo';
         if (codigo.startsWith('2')) return 'pasivo';
