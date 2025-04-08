@@ -787,7 +787,6 @@ export class ReportesService {
             relations: ['lineItems'],
         });
 
-        //console.log(saldoAnteriorEntries);
 
 
         // 2. Obtener MOVIMIENTOS (transacciones entre las fechas seleccionadas)
@@ -820,7 +819,6 @@ export class ReportesService {
             };
         });
 
-        console.log(accountValues);
 
         // Procesar SALDO ANTERIOR
         saldoAnteriorEntries.forEach(entry => {
