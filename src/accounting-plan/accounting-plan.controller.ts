@@ -17,13 +17,13 @@ import { CreateAccountingPlanDto } from './dto/create-accounting-plan.dto';
 import { UpdateAccountingPlanDto } from './dto/update-accounting-plan.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
-import * as XLSX from 'xlsx';
+import * as ExcelJS from 'exceljs';
 import * as multer from 'multer';
 
 @ApiTags('accounting')
 @Controller('accounting-plan')
 export class AccountingPlanController {
-  constructor(private readonly accountingPlanService: AccountingPlanService) {}
+  constructor(private readonly accountingPlanService: AccountingPlanService) { }
 
   @Post()
   async create(
@@ -74,23 +74,28 @@ export class AccountingPlanController {
       }
 
       // Read and process Excel file (previous logic remains the same)
-      const workbook = XLSX.read(file.buffer, { type: 'buffer' });
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(file.buffer);
+      const worksheet = workbook.worksheets[0];
+      if (!worksheet) {
+        throw new BadRequestException('No se encontró ninguna hoja en el archivo Excel');
+      }
 
-      if (jsonData.length < 2) {
+      const rows = worksheet.getRows(1, worksheet.rowCount) || [];
+      if (rows.length < 2) {
         throw new BadRequestException(
           'El archivo Excel está vacío o solo contiene encabezados',
         );
       }
 
-      const headers = jsonData[0] as string[];
-      const codeIndex = headers.findIndex(
-        (header) => header.toLowerCase() === 'code',
-      );
-      const nameIndex = headers.findIndex(
-        (header) => header.toLowerCase() === 'name',
-      );
+      const headerRow = worksheet.getRow(1);
+      const headers = [];
+      headerRow.eachCell((cell, colNumber) => {
+        headers[colNumber - 1] = cell.value ? cell.value.toString().toLowerCase() : '';
+      });
+
+      const codeIndex = headers.findIndex(header => header === 'code');
+      const nameIndex = headers.findIndex(header => header === 'name');
 
       if (codeIndex === -1 || nameIndex === -1) {
         throw new BadRequestException(
@@ -98,11 +103,17 @@ export class AccountingPlanController {
         );
       }
 
-      const records = jsonData.slice(1).map((row) => ({
-        code: row[codeIndex]?.toString()?.trim(),
-        name: row[nameIndex]?.toString()?.trim(),
-        empresa_id: empresa_id,
-      }));
+      const records = [];
+      for (let i = 2; i <= worksheet.rowCount; i++) {
+        const row = worksheet.getRow(i);
+        if (row.hasValues) {
+          records.push({
+            code: row.getCell(codeIndex + 1).value?.toString()?.trim(),
+            name: row.getCell(nameIndex + 1).value?.toString()?.trim(),
+            empresa_id: empresa_id,
+          });
+        }
+      }
 
       // Validate and save the data
       const result = await this.accountingPlanService.importData(records);
