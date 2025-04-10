@@ -33,14 +33,14 @@ async function bootstrap() {
 
   // Habilitar CORS
   app.enableCors({
-    origin: configService.get<string>('FRONTEND_URL'), // Origen permitido (tu frontend)
-    methods: configService.get<string>('FRONTEND_METHODS'),
+    origin: configService.get('FRONTEND_URL'),
+    methods: configService.get('FRONTEND_METHODS')?.split(',') || ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: 'Content-Type, Accept, Authorization',
     credentials: true,
   });
   
 
-  await app.listen(4000);
+  await app.listen(process.env.PORT || 4000);
 }
 
 bootstrap();

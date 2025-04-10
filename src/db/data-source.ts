@@ -1,23 +1,17 @@
-import { DataSource, DataSourceOptions } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
-import { config } from 'dotenv';
+import { DataSourceOptions } from "typeorm";
 
-config(); // Para cargar el archivo .env
-
-const configService = new ConfigService();
+if (!process.env.DB_HOST || !process.env.DB_PORT) {
+     throw new Error("Faltan variables de entorno para la DB");
+}
 
 export const dataSourceOptions: DataSourceOptions = {
      type: 'mysql',
-     host: configService.get('DB_HOST'),
-     port: configService.get('DB_PORT'),
-     username: configService.get('DB_USERNAME'),
-     password: configService.get('DB_PASSWORD'),
-     database: configService.get('DB_DATABASE'),
-     //entities: [User, AccountingPlan, DatCentro],
+     host: process.env.DB_HOST || 'localhost',
+     port: parseInt(process.env.DB_PORT ?? '3306'),
+     username: process.env.DB_USERNAME || 'root',
+     password: process.env.DB_PASSWORD || '',
+     database: process.env.DB_DATABASE || 'nest_type_orm',
      entities: [__dirname + '/../**/*.entity{.ts,.js}'],
      migrations: [__dirname + '/../db/migrations/*.ts'],
-     synchronize: configService.get('SINCRONIZE_DB'),
+     synchronize: process.env.SYNCHRONIZE_DB === 'true', // false en producción
 };
-
-const dataSource = new DataSource(dataSourceOptions);
-export default dataSource;
