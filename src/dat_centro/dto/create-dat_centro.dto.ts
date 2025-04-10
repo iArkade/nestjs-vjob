@@ -7,28 +7,28 @@ export class CreateDatCentroDto {
           example: '1',
      })
      @IsString()
-     empresa_id: number;
+     empresa_id!: number;
 
      @ApiProperty({
-          description: 'Código único del centro', 
+          description: 'Código único del centro',
           example: 'CENT456',
           nullable: true,
      })
      @IsString()
-     codigo: string;
+     codigo!: string;
      
      @ApiProperty({
-     description: 'Nombre del centro',
-     example: 'Centro 1',
-     nullable: true,
+          description: 'Nombre del centro',
+          example: 'Centro 1',
+          nullable: true,
      })
      @IsString()
-     nombre: string;
+     nombre!: string;
      
      @ApiProperty({
-     description: 'Estado activo del centro',
-     example: 'true',
+          description: 'Estado activo del centro',
+          example: 'true',
      })
      @IsBoolean()
-     activo: boolean;
+     activo!: boolean;
 }

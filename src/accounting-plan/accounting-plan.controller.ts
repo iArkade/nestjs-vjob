@@ -62,10 +62,8 @@ export class AccountingPlanController {
     }
 
     try {
-      // Validate if records already exist for this company
-      const existingRecordsCount =
-        await this.accountingPlanService.countRecords(empresa_id);
-
+      // Validación de registros existentes
+      const existingRecordsCount = await this.accountingPlanService.countRecords(empresa_id);
       if (existingRecordsCount > 0) {
         throw new BadRequestException({
           message: 'Ya existe un plan de cuentas para esta empresa',
@@ -73,52 +71,74 @@ export class AccountingPlanController {
         });
       }
 
-      // Read and process Excel file (previous logic remains the same)
+      // Procesamiento del Excel
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.load(file.buffer);
       const worksheet = workbook.worksheets[0];
+
       if (!worksheet) {
         throw new BadRequestException('No se encontró ninguna hoja en el archivo Excel');
       }
 
-      const rows = worksheet.getRows(1, worksheet.rowCount) || [];
-      if (rows.length < 2) {
-        throw new BadRequestException(
-          'El archivo Excel está vacío o solo contiene encabezados',
-        );
-      }
+      // Definición de tipos para los headers
+      type ExcelHeader = 'code' | 'name';
+      const headers: ExcelHeader[] = [];
 
       const headerRow = worksheet.getRow(1);
-      const headers = [];
       headerRow.eachCell((cell, colNumber) => {
-        headers[colNumber - 1] = cell.value ? cell.value.toString().toLowerCase() : '';
+        const value = cell.value?.toString().toLowerCase().trim();
+        if (value === 'code' || value === 'name') {
+          headers[colNumber - 1] = value as ExcelHeader;
+        }
       });
 
-      const codeIndex = headers.findIndex(header => header === 'code');
-      const nameIndex = headers.findIndex(header => header === 'name');
+      // Validación de columnas requeridas
+      const hasCode = headers.includes('code');
+      const hasName = headers.includes('name');
 
-      if (codeIndex === -1 || nameIndex === -1) {
+      if (!hasCode || !hasName) {
         throw new BadRequestException(
           'Estructura inválida en el Excel. Faltan las columnas "code" o "name".',
         );
       }
 
-      const records = [];
+      // Definición del tipo para los registros
+      interface AccountingRecord {
+        code: string;
+        name: string;
+        empresa_id: number;
+      }
+
+      const records: AccountingRecord[] = [];
+
       for (let i = 2; i <= worksheet.rowCount; i++) {
         const row = worksheet.getRow(i);
         if (row.hasValues) {
+          const code = row.getCell(headers.indexOf('code') + 1).value?.toString()?.trim();
+          const name = row.getCell(headers.indexOf('name') + 1).value?.toString()?.trim();
+
+          // Validamos que los campos requeridos no sean undefined
+          if (!code || !name) {
+            throw new BadRequestException(
+              `Fila ${i}: Los campos 'code' y 'name' son requeridos y no pueden estar vacíos`
+            );
+          }
+
           records.push({
-            code: row.getCell(codeIndex + 1).value?.toString()?.trim(),
-            name: row.getCell(nameIndex + 1).value?.toString()?.trim(),
-            empresa_id: empresa_id,
+            code,
+            name,
+            empresa_id,
           });
         }
       }
 
-      // Validate and save the data
+      // Validación adicional si es necesario
+      if (records.length === 0) {
+        throw new BadRequestException('No se encontraron registros válidos en el archivo');
+      }
+
       const result = await this.accountingPlanService.importData(records);
 
-      // If there are errors, throw an exception with details
       if (result.errors && result.errors.length > 0) {
         throw new BadRequestException({
           message: 'Errores en la importación',
@@ -131,7 +151,6 @@ export class AccountingPlanController {
         ...result,
       };
     } catch (error) {
-      // Handle specific errors
       if (error instanceof BadRequestException) {
         throw error;
       }

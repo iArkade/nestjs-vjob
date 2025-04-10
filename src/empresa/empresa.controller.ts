@@ -24,7 +24,7 @@ import * as path from 'path';
 import { unlink } from 'fs/promises';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Empresa } from './entities/empresa.entity';
-import { SystemRole } from 'src/users/enums/role.enum';
+import { SystemRole } from '../users/enums/role.enum';
 
 @ApiTags('empresa')
 @Controller('empresa')
@@ -33,7 +33,7 @@ export class EmpresaController {
     constructor(private readonly empresaService: EmpresaService) { }
 
     @Get('all')
-    async findAll(@Req() req): Promise<Empresa[]> {
+    async findAll(@Req() req:any): Promise<Empresa[]> {
         const user = req.user;
 
         if (user.systemRole === SystemRole.SUPERADMIN) {
@@ -57,7 +57,7 @@ export class EmpresaController {
                         const ext = path.extname(file.originalname || '');
                         cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
                     } catch (error) {
-                        cb(new Error('Error al procesar el archivo'), null);
+                        cb(new Error('Error al procesar el archivo'), "");
                     }
                 },
             }),
@@ -73,7 +73,7 @@ export class EmpresaController {
         }),
     )
     async create(
-        @Req() req,
+        @Req()  req:any,
         @Body() createEmpresaDTO: CreateEmpresaDto,
         @UploadedFile() file: Express.Multer.File,
     ) {
@@ -106,7 +106,7 @@ export class EmpresaController {
                         const ext = path.extname(file.originalname || '');
                         cb(null, `${file.fieldname}-${uniqueSuffix}${ext}`);
                     } catch (error) {
-                        cb(new Error('Error al procesar el archivo'), null);
+                        cb(new Error('Error al procesar el archivo'), "");
                     }
                 },
             }),
@@ -122,7 +122,7 @@ export class EmpresaController {
         }),
     )
     async update(
-        @Req() req,
+        @Req()  req:any,
         @Param('id', ParseIntPipe) id: number,
         @Body() updateEmpresaDTO: UpdateEmpresaDto,
         @UploadedFile() file: Express.Multer.File,
@@ -163,7 +163,7 @@ export class EmpresaController {
 
     @Delete(':id')
     async delete(
-        @Req() req,
+        @Req()  req:any,
         @Param('id', ParseIntPipe) id: number
     ): Promise<void> {
         const user = req.user;

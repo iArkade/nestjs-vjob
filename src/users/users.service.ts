@@ -4,8 +4,8 @@ import { In, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 
 import { Usuario } from './entities/user.entity';
-import { UsuarioEmpresa } from 'src/usuario_empresa/entities/usuario_empresa.entity';
-import { Empresa } from 'src/empresa/entities/empresa.entity';
+import { UsuarioEmpresa } from '../usuario_empresa/entities/usuario_empresa.entity';
+import { Empresa } from '../empresa/entities/empresa.entity';
 import { AssignCompanyDto, CreateUserDto } from './dtos/create.user.dto';
 import { UpdateUserDto } from './dtos/update.user.dto';
 import { SystemRole } from './enums/role.enum';
@@ -24,7 +24,7 @@ export class UsersService {
      private async handleCompanyAssignments(
           transactionalEntityManager: any,
           usuario: Usuario,
-          empresas: AssignCompanyDto[],
+          empresas: AssignCompanyDto[] | undefined,
           superadmin: Usuario
      ) {
           // Eliminar asignaciones existentes
@@ -35,9 +35,9 @@ export class UsersService {
                .where("usuarioId = :userId", { userId: usuario.id })
                .execute();
 
-          if (empresas?.length > 0) {
+          if (empresas && empresas.length > 0) {
                // Obtener todas las empresas en una sola consulta
-               const empresaIds = empresas.map(e => e.empresaId);
+               const empresaIds = empresas.map((e: AssignCompanyDto) => e.empresaId);
                const empresasFound = await transactionalEntityManager.find(Empresa, {
                     where: {
                          id: In(empresaIds),
@@ -51,8 +51,8 @@ export class UsersService {
                }
 
                // Crear las asignaciones en batch
-               const usuarioEmpresas = empresas.map(empresaDto => {
-                    const empresa = empresasFound.find(e => e.id === empresaDto.empresaId);
+               const usuarioEmpresas = empresas.map((empresaDto: AssignCompanyDto) => {
+                    const empresa = empresasFound.find((e: Empresa) => e.id === empresaDto.empresaId);
                     return transactionalEntityManager.create(UsuarioEmpresa, {
                          usuario,
                          empresa,
@@ -131,10 +131,16 @@ export class UsersService {
                Object.assign(usuario, userToUpdate);
                await transactionalEntityManager.save(Usuario, usuario);
 
-               return await transactionalEntityManager.findOne(Usuario, {
+               const updatedUser = await transactionalEntityManager.findOne(Usuario, {
                     where: { id },
                     relations: ['empresas', 'empresas.empresa'],
                });
+               
+               if (!updatedUser) {
+                    throw new NotFoundException('Usuario no encontrado después de actualizar');
+               }
+               
+               return updatedUser;
           });
      }
 
@@ -168,18 +174,26 @@ export class UsersService {
           // Guardar usuario en la base de datos
           const savedUser = await this.usuarioRepository.save(nuevoUsuario);
 
-          // Crear relación usuario-empresa
-          const usuarioEmpresa = this.usuarioEmpresaRepository.create({
-               usuario: savedUser,
-               empresa: { id: empresaId },
-               companyRole: createUserDto.empresas[0].companyRole, // Tomamos el rol enviado desde el frontend
-          });
+          // Verificar que empresas exista antes de acceder a su primer elemento
+          if (createUserDto.empresas && createUserDto.empresas.length > 0) {
+               // Crear relación usuario-empresa
+               const usuarioEmpresa = this.usuarioEmpresaRepository.create({
+                    usuario: savedUser,
+                    empresa: { id: empresaId },
+                    companyRole: createUserDto.empresas[0].companyRole, // Tomamos el rol enviado desde el frontend
+               });
 
-          await this.usuarioEmpresaRepository.save(usuarioEmpresa);
+               await this.usuarioEmpresaRepository.save(usuarioEmpresa);
+          }
+
           const userWithRelations = await this.usuarioRepository.findOne({
                where: { id: savedUser.id },
                relations: ['empresas', 'empresas.empresa'], // Cargar relaciones
           });
+
+          if (!userWithRelations) {
+              throw new NotFoundException('Usuario no encontrado después de crearlo');
+          }
 
           return userWithRelations;
      }
@@ -245,10 +259,16 @@ export class UsersService {
           }
 
           // Retornar usuario actualizado con las relaciones cargadas
-          return await this.usuarioRepository.findOne({
+          const updatedUser = await this.usuarioRepository.findOne({
                where: { id: userId },
                relations: ['empresas', 'empresas.empresa'],
           });
+          
+          if (!updatedUser) {
+              throw new NotFoundException('Usuario no encontrado después de actualizar');
+          }
+          
+          return updatedUser;
      }
 
      async deleteByEmpresa(empresaId: number, userId: number, currentUser: Usuario) {
@@ -342,10 +362,6 @@ export class UsersService {
           return await this.usuarioRepository.manager.transaction(async transactionalEntityManager => {
                const usuario = await this.findOne(id, superadmin);
 
-               if (!usuario) {
-                    throw new NotFoundException('Usuario no encontrado');
-               }
-
                // Primero eliminamos todas las relaciones usuario_empresa
                await transactionalEntityManager
                     .createQueryBuilder()
@@ -418,20 +434,30 @@ export class UsersService {
      }
 
      async findOneByEmail(email: string) {
-          return await this.usuarioRepository.findOneBy({ email });
+          const user = await this.usuarioRepository.findOneBy({ email });
+          return user;
      }
 
      async findOneById(id: number) {
-          return await this.usuarioRepository.findOneBy({ id });
+          const user = await this.usuarioRepository.findOneBy({ id });
+          return user;
      }
 
      async updateUserToken(id: number, updateUserDto: UpdateUserDto): Promise<Usuario> {
           await this.usuarioRepository.update({ id }, updateUserDto);
-          return await this.usuarioRepository.findOneBy({ id });
+          const user = await this.usuarioRepository.findOneBy({ id });
+          if (!user) {
+               throw new NotFoundException('Usuario no encontrado');
+          }
+          return user;
      }
 
      async clearAllTokens(userId: number): Promise<Usuario> {
-          await this.usuarioRepository.update({ id: userId }, { tokens: null });
-          return await this.usuarioRepository.findOneBy({ id: userId });
+          await this.usuarioRepository.update({ id: userId }, { tokens: null as any });
+          const user = await this.usuarioRepository.findOneBy({ id: userId });
+          if (!user) {
+               throw new NotFoundException('Usuario no encontrado');
+          }
+          return user;
      }
 }

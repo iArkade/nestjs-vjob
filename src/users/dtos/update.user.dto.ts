@@ -1,6 +1,7 @@
 import { PartialType, OmitType, ApiPropertyOptional } from '@nestjs/swagger';
-import { CreateUserDto } from './create.user.dto';
-import { IsOptional, IsBoolean, IsString, MinLength, ValidateIf, IsNumber } from 'class-validator';
+import { CreateUserDto, AssignCompanyDto } from './create.user.dto';
+import { IsOptional, IsBoolean, IsString, MinLength, ValidateIf, IsNumber, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class UpdateUserDto extends PartialType(CreateUserDto) {
      @ApiPropertyOptional({
@@ -31,8 +32,10 @@ export class UpdateUserDto extends PartialType(CreateUserDto) {
 
      @ApiPropertyOptional({
           description: 'Lista de empresas y roles a asignar',
-          type: [CreateUserDto['empresas']],
+          type: [AssignCompanyDto],
      })
      @IsOptional()
-     empresas?: CreateUserDto['empresas'];
+     @ValidateNested({ each: true })
+     @Type(() => AssignCompanyDto)
+     empresas?: AssignCompanyDto[];
 }

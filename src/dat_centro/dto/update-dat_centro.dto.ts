@@ -21,10 +21,10 @@ export class UpdateDatCentroDto extends PartialType(CreateDatCentroDto) {
     
     
         @ApiProperty({
-            description: '1 campo bloqueado y 0 campo no bloqueado)',
-            example: 'true',
-        })
-        @IsOptional()
-        @IsBoolean()
-        activo: boolean;
+        description: '1 campo bloqueado y 0 campo no bloqueado)',
+        example: 'true',
+    })
+    @IsOptional()
+    @IsBoolean()
+    activo: boolean = false;
 }

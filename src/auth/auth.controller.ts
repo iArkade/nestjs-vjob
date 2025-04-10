@@ -57,7 +57,7 @@ export class AuthController {
           status: 401,
           description: 'Invalid or missing token.'
      })
-     async logout(@Req() req, @Headers('authorization') authHeader: string) {
+     async logout(@Req() req: any, @Headers('authorization') authHeader: string) {
           if (!authHeader || !authHeader.startsWith('Bearer ')) {
                throw new UnauthorizedException('Invalid or missing token');
           }

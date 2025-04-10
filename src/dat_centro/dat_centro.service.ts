@@ -4,7 +4,7 @@ import { UpdateDatCentroDto } from './dto/update-dat_centro.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DatCentro } from './entities/dat_centro.entity';
 import { Not, Repository } from 'typeorm';
-import { Asiento } from 'src/asiento/entities/asiento.entity';
+import { Asiento } from '../asiento/entities/asiento.entity';
 
 @Injectable()
 export class DatCentroService {

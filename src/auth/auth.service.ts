@@ -10,9 +10,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 
-import { Usuario } from 'src/users/entities/user.entity';
+import { Usuario } from '../users/entities/user.entity';
 import { UsuarioEmpresa } from '../usuario_empresa/entities/usuario_empresa.entity';
-import { SystemRole } from 'src/users/enums/role.enum';
+import { CompanyRole, SystemRole } from '../users/enums/role.enum';
 import { RegisterDto } from './dtos/register.dto';
 import { LoginDto } from './dtos/login.dto';
 
@@ -38,14 +38,18 @@ export class AuthService {
                     throw new ConflictException('El email ya está registrado');
                }
 
-               const usuario = this.usuarioRepository.create({
-                    name,
-                    lastname,
+               const usuarioData = {
+                    name: name || undefined, // Asegura que cumple con string | null
+                    lastname: lastname || undefined,
                     email,
                     password: await bcrypt.hash(password, 10),
                     systemRole: SystemRole.SUPERADMIN,
-                    createdBy: null
-               });
+                    createdBy: undefined, // Explícitamente null para Superadmin
+                    active: true
+               };
+               const usuario = this.usuarioRepository.create(usuarioData);
+
+     
 
                const usuarioGuardado = await this.usuarioRepository.save(usuario);
 
@@ -98,7 +102,7 @@ export class AuthService {
                }
 
                // Buscar empresas asignadas si no es Superadmin
-               let empresasAsignadas = [];
+               let empresasAsignadas: { id: number; nombre: string; role: CompanyRole; }[] = [];
                if (usuario.systemRole !== SystemRole.SUPERADMIN) {
                     const usuarioEmpresas = await this.usuarioEmpresaRepository.find({
                          where: { usuario: { id: usuario.id } },
@@ -166,7 +170,7 @@ export class AuthService {
                const tokensArray = usuario.tokens.split(', ').filter(t => t !== token);
 
                // Si no quedan tokens, establece el campo como null
-               usuario.tokens = tokensArray.length ? tokensArray.join(', ') : null;
+               usuario.tokens = tokensArray.length ? tokensArray.join(', ') : undefined;
 
                // Guarda los cambios en la base de datos
                await this.usuarioRepository.save(usuario);

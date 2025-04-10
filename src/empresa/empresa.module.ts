@@ -5,8 +5,8 @@ import { EmpresaController } from './empresa.controller';
 import { EmpresaService } from './empresa.service';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
-import { Usuario } from 'src/users/entities/user.entity';
-import { UsuarioEmpresa } from 'src/usuario_empresa/entities/usuario_empresa.entity';
+import { Usuario } from '../users/entities/user.entity';
+import { UsuarioEmpresa } from '../usuario_empresa/entities/usuario_empresa.entity';
 
 
 @Module({

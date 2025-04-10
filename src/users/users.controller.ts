@@ -3,10 +3,10 @@ import { AssignCompanyDto, CreateUserDto } from './dtos/create.user.dto';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dtos/update.user.dto';
 import { ApiTags } from '@nestjs/swagger';
-import { RoleGuard } from 'src/auth/guards/role.guard';
-import { Roles } from 'src/decorators/roles.decorator';
+import { RoleGuard } from '../auth/guards/role.guard';
+import { Roles } from '../decorators/roles.decorator';
 import { SystemRole } from './enums/role.enum';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @ApiTags('usuario')
 @Controller('usuario')
@@ -17,7 +17,7 @@ export class UsersController {
 
      @Post()
      @UseGuards(JwtAuthGuard)
-     async create(@Request() req, @Body() createUserDto: CreateUserDto) {
+     async create(@Request() req: any, @Body() createUserDto: CreateUserDto) {
           return await this.usersService.create(createUserDto, req.user);
      }
 
@@ -26,7 +26,7 @@ export class UsersController {
      async createByEmpresa(
           @Param('empresaId', ParseIntPipe) empresaId: number,
           @Body() createUserDto: CreateUserDto,
-          @Request() req,
+          @Request() req: any,
      ) {
           console.log(req.user)
           return this.usersService.createByEmpresa(empresaId, createUserDto, req.user);
@@ -38,7 +38,7 @@ export class UsersController {
           @Param('empresaId', ParseIntPipe) empresaId: number,
           @Param('userId', ParseIntPipe) userId: number,
           @Body() updateUserDto: UpdateUserDto,
-          @Request() req
+          @Request() req: any
      ) {
           return await this.usersService.updateByEmpresa(empresaId, userId, updateUserDto, req.user);
      }
@@ -48,7 +48,7 @@ export class UsersController {
      async deleteByEmpresa(
           @Param('empresaId', ParseIntPipe) empresaId: number,
           @Param('userId', ParseIntPipe) userId: number,
-          @Request() req
+          @Request() req: any
      ) {
           return await this.usersService.deleteByEmpresa(empresaId, userId, req.user);
      }
@@ -57,20 +57,20 @@ export class UsersController {
      @Get()
      @UseGuards(JwtAuthGuard, RoleGuard)
      @Roles(SystemRole.SUPERADMIN)
-     async findAll(@Request() req) {
+     async findAll(@Request() req: any) {
           return await this.usersService.findAll(req.user);
      }
 
      @Get('empresa/:empresaId')
      @UseGuards(JwtAuthGuard)
-     async findAllByEmpresa(@Param('empresaId', ParseIntPipe) empresaId: number, @Request() req) {
+     async findAllByEmpresa(@Param('empresaId', ParseIntPipe) empresaId: number, @Request() req: any) {
           return this.usersService.findAllByEmpresa(empresaId, req.user);
      }
 
      @Get(':id')
      @UseGuards(JwtAuthGuard, RoleGuard)
      @Roles(SystemRole.SUPERADMIN)
-     async findOne(@Param('id', ParseIntPipe) id: number, @Request() req) {
+     async findOne(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
           return await this.usersService.findOne(id, req.user);
      }
 
@@ -80,7 +80,7 @@ export class UsersController {
      async update(
           @Param('id', ParseIntPipe) id: number,
           @Body() updateUserDto: UpdateUserDto,
-          @Request() req,
+          @Request() req: any,
      ) {
           return await this.usersService.update(id, updateUserDto, req.user);
      }
@@ -88,7 +88,7 @@ export class UsersController {
      @Delete(':id')
      @UseGuards(JwtAuthGuard, RoleGuard)
      @Roles(SystemRole.SUPERADMIN)
-     async remove(@Param('id', ParseIntPipe) id: number, @Request() req) {
+     async remove(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
           return await this.usersService.remove(id, req.user);
      }
 
@@ -98,7 +98,7 @@ export class UsersController {
      async assignCompany(
           @Param('userId', ParseIntPipe) userId: number,
           @Body() assignCompanyDto: AssignCompanyDto,
-          @Request() req,
+          @Request() req: any,
      ) {
           return await this.usersService.assignCompany(userId, assignCompanyDto, req.user);
      }
@@ -109,7 +109,7 @@ export class UsersController {
      async removeCompany(
           @Param('userId', ParseIntPipe) userId: number,
           @Param('empresaId', ParseIntPipe) empresaId: number,
-          @Request() req,
+          @Request() req: any,
      ) {
           return await this.usersService.removeCompany(userId, empresaId, req.user);
      }

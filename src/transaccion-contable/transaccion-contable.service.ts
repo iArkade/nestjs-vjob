@@ -2,9 +2,9 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { CreateTransaccionContableDto } from './dto/create-transaccion-contable.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { TransaccionContable } from './entities/transaccion-contable.entity';
-import { Like, Not, Raw, Repository } from 'typeorm';
+import {  Not, Repository } from 'typeorm';
 import { UpdateTransaccionContablenDto } from './dto/update-transaccion-contable.dto';
-import { Asiento } from 'src/asiento/entities/asiento.entity';
+import { Asiento } from '../asiento/entities/asiento.entity';
 
 @Injectable()
 export class TransaccionContableService {

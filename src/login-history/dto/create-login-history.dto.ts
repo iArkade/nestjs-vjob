@@ -2,8 +2,8 @@ import { IsNumber, IsString } from "class-validator";
 
 export class CreateLoginHistoryDto {
      @IsNumber()
-     userId: number;
+     userId!: number;
 
      @IsString()
-     userName: string;
+     userName!: string;
 }

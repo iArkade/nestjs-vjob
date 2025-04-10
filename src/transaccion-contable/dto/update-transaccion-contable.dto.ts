@@ -34,7 +34,7 @@ export class UpdateTransaccionContablenDto extends PartialType(CreateTransaccion
     })
     @IsOptional()
     @IsNumber()
-    lectura: number;
+    lectura!: number;
 
     @ApiProperty({
         description: '1 campo bloqueado y 0 campo no bloqueado)',
@@ -42,5 +42,5 @@ export class UpdateTransaccionContablenDto extends PartialType(CreateTransaccion
     })
     @IsOptional()
     @IsBoolean()
-    activo: boolean;
+    activo!: boolean;
 }

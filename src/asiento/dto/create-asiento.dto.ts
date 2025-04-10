@@ -18,7 +18,7 @@ export class CreateAsientoDto {
           example: '1',
      })
      @IsNumber()
-     empresa_id: number;
+     empresa_id!: number;
 
      @ApiProperty({
           description: 'Fecha de emisión del asiento',
@@ -26,14 +26,14 @@ export class CreateAsientoDto {
           format: 'date',
      })
      @IsDateString()
-     fecha_emision: string;
+     fecha_emision!: string;
 
      @ApiProperty({
           description: 'Número único del asiento',
           example: 'AS00123',
      })
      @IsString()
-     nro_asiento: string;
+     nro_asiento!: string;
 
      @ApiProperty({
           description: 'Comentario opcional',
@@ -49,14 +49,14 @@ export class CreateAsientoDto {
           example: 'Compra',
      })
      @IsString()
-     codigo_transaccion: string;
+     codigo_transaccion!: string;
 
      @ApiProperty({
           description: 'Estado del asiento',
           example: 'Activo',
      })
      @IsString()
-     estado: string;
+     estado!: string;
 
      @ApiProperty({
           description: 'Número de referencia opcional',
@@ -79,25 +79,25 @@ export class CreateAsientoDto {
           example: 'CC001',
      })
      @IsString()
-     codigo_centro: string;
+     codigo_centro!: string;
 
      @ApiProperty({
           description: 'Total del debe',
           example: 1000.0,
      })
      @IsNumber()
-     total_debe: number;
+     total_debe!: number;
 
      @ApiProperty({
           description: 'Total del haber',
           example: 1000.0,
      })
      @IsNumber()
-     total_haber: number;
+     total_haber!: number;
 
      @IsArray()
      @ValidateNested({ each: true })
      @Type(() => CreateAsientoItemDto)
-     lineItems: CreateAsientoItemDto[];
+     lineItems!: CreateAsientoItemDto[];
 }
 

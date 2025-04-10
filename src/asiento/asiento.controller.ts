@@ -3,19 +3,17 @@ import {
   Get,
   Post,
   Body,
-  Patch,
   Param,
   Delete,
-  HttpException,
-  HttpStatus,
   ParseIntPipe,
   Put,
   Query,
+  HttpCode,
 } from '@nestjs/common';
 import { AsientoService } from './asiento.service';
 import { CreateAsientoDto } from './dto/create-asiento.dto';
 import { UpdateAsientoDto } from './dto/update-asiento.dto';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags, ApiResponse } from '@nestjs/swagger';
 import { Asiento } from './entities/asiento.entity';
 
 @ApiTags('asientos')
@@ -24,81 +22,57 @@ export class AsientoController {
   constructor(private readonly asientoService: AsientoService) {}
 
   @Get()
+  @ApiResponse({ status: 200, description: 'Lista de asientos', type: [Asiento] })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
   async findAllWithLineItems(@Query('empresa_id') empresa_id: number): Promise<Asiento[]> {
-    try {
-      return await this.asientoService.findAllWithLineItems(empresa_id);
-    } catch (error) {
-      throw new HttpException(
-        { message: 'Error al obtener los asientos', error: error.message },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    return this.asientoService.findAllWithLineItems(empresa_id);
   }
 
   @Post()
+  @HttpCode(201)
+  @ApiResponse({ status: 201, description: 'Asiento creado exitosamente' })
+  @ApiResponse({ status: 409, description: 'Conflicto al crear el asiento' })
   async createAsiento(@Body() createAsientoDto: CreateAsientoDto) {
-    try {
-      const newAsiento = await this.asientoService.createAsientoWithItems(createAsientoDto);
-      return {
-        message: 'Asiento creado exitosamente',
-        data: newAsiento,
-      };
-    } catch (error) {
-      throw new HttpException(
-        { message: error.message || 'Error al crear el asiento' },
-        HttpStatus.CONFLICT, // Usa 409 Conflict para errores de duplicación
-      );
-    } 
+    const newAsiento = await this.asientoService.createAsientoWithItems(createAsientoDto);
+    return {
+      message: 'Asiento creado exitosamente',
+      data: newAsiento,
+    };
   }
 
   @Get(':id')
+  @ApiResponse({ status: 200, description: 'Asiento encontrado', type: Asiento })
+  @ApiResponse({ status: 404, description: 'Asiento no encontrado' })
   async getAsiento(
     @Param('id', ParseIntPipe) id: number,
     @Query('empresa_id', ParseIntPipe) empresaId: number,
   ): Promise<Asiento> {
-    try {
-      return await this.asientoService.findOneWithItems(id, empresaId);
-    } catch (error) {
-      throw new HttpException(
-        { message: 'Error al obtener el asiento', error: error.message },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    return this.asientoService.findOneWithItems(id, empresaId);
   }
 
   @Put(':id')
+  @ApiResponse({ status: 200, description: 'Asiento actualizado exitosamente' })
+  @ApiResponse({ status: 404, description: 'Asiento no encontrado' })
   async updateAsiento(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateAsientoDto: UpdateAsientoDto,
     @Query('empresa_id') empresa_id: number,
   ) {
-    try {
-      const updatedAsiento = await this.asientoService.updateAsiento(id, updateAsientoDto, empresa_id);
-      return {
-        message: 'Asiento actualizado exitosamente',
-        data: updatedAsiento,
-      };
-    } catch (error) {
-      throw new HttpException(
-        { message: 'Error al actualizar el asiento', error: error.message },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    const updatedAsiento = await this.asientoService.updateAsiento(id, updateAsientoDto, empresa_id);
+    return {
+      message: 'Asiento actualizado exitosamente',
+      data: updatedAsiento,
+    };
   }
 
   @Delete(':id')
+  @ApiResponse({ status: 200, description: 'Asiento eliminado exitosamente' })
+  @ApiResponse({ status: 404, description: 'Asiento no encontrado' })
   async deleteAsiento(
     @Param('id', ParseIntPipe) id: number,
     @Query('empresa_id') empresa_id: number,
   ) {
-    try {
-      await this.asientoService.deleteAsiento(id, empresa_id);
-      return { message: 'Asiento eliminado exitosamente' };
-    } catch (error) {
-      throw new HttpException(
-        { message: 'Error al eliminar el asiento', error: error.message },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    await this.asientoService.deleteAsiento(id, empresa_id);
+    return { message: 'Asiento eliminado exitosamente' };
   }
 }

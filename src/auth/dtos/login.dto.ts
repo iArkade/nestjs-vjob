@@ -10,17 +10,17 @@ export class LoginDto{
      })
      @IsEmail()
      @IsNotEmpty()
-     email: string;
+     email!: string;
      
      @ApiProperty({
-     description: 'Password for the user account. It should be at least 6 characters long.',
-     example: 'password123',
-     minLength: 6,
+          description: 'Password for the user account. It should be at least 6 characters long.',
+          example: 'password123',
+          minLength: 6,
      })
      @Transform(({ value }) => value.trim())
      @IsString()
      @IsNotEmpty()
      @MinLength(6)
-     password: string;
+     password!: string;
 
 }

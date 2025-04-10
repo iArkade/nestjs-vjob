@@ -7,7 +7,7 @@ export class AssignCompanyDto {
      @ApiProperty({ description: 'ID de la empresa' })
      @IsNotEmpty()
      @IsNumber()
-     empresaId: number;
+     empresaId!: number;
 
      @ApiProperty({
           description: 'Rol del usuario en la empresa',
@@ -15,7 +15,7 @@ export class AssignCompanyDto {
      })
      @IsEnum(CompanyRole)
      @IsNotEmpty()
-     companyRole: CompanyRole;
+     companyRole!: CompanyRole;
 }
 
 export class CreateUserDto {
@@ -25,7 +25,7 @@ export class CreateUserDto {
      })
      @IsEmail()
      @IsNotEmpty()
-     email: string;
+     email!: string;
 
      @ApiProperty({
           description: 'Contraseña del usuario',
@@ -34,7 +34,7 @@ export class CreateUserDto {
      })
      @IsString()
      @MinLength(6)
-     password: string;
+     password!: string;
 
      @ApiPropertyOptional({
           description: 'Nombre del usuario',

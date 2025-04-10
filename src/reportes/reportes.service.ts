@@ -1,9 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { AccountingPlan } from 'src/accounting-plan/entities/accounting-plan.entity';
-import { AsientoItem } from 'src/asiento/entities/asiento-item.entity';
-import { Asiento } from 'src/asiento/entities/asiento.entity';
+import { AccountingPlan } from '../accounting-plan/entities/accounting-plan.entity';
+import { AsientoItem } from '../asiento/entities/asiento-item.entity';
+import { Asiento } from '../asiento/entities/asiento.entity';
 import { Between, LessThan, LessThanOrEqual, Like, Repository } from 'typeorm';
+import { BalanceComprobacionItem, BalanceGeneralItem, LibroDiarioItem, MayorGeneralItem, ProfitAndLossItem } from './interfaces/reportes.interfaces';
 
 @Injectable()
 export class ReportesService {
@@ -14,7 +15,113 @@ export class ReportesService {
         private accountingEntryItemRepository: Repository<AsientoItem>,
         @InjectRepository(AccountingPlan)
         private accountPlanRepository: Repository<AccountingPlan>,
-    ) { }
+    ) {}
+
+    private formatDateToISO(date: Date): string {
+        return date.toISOString().split('T')[0];
+    }
+
+    private clasificarTipoCuenta(codigo: string): 'activo' | 'pasivo' | 'patrimonio' | 'ingreso' | 'gasto' {
+        const firstChar = codigo[0];
+        switch (firstChar) {
+            case '1': return 'activo';
+            case '2': return 'pasivo';
+            case '3': return 'patrimonio';
+            case '4': return 'ingreso';
+            case '5': return 'gasto';
+            default: return 'activo';
+        }
+    }
+
+    private async getAccountPlans(empresaId: number, filter?: (account: AccountingPlan) => boolean) {
+        const accounts = await this.accountPlanRepository.find({
+            where: { empresa_id: empresaId },
+            order: { code: 'ASC' },
+        });
+        return filter ? accounts.filter(filter) : accounts;
+    }
+
+    async getAccountingEntries(
+        empresaId: number,
+        { from, to }: { from?: Date; to?: Date }
+      ) {
+        const query = this.accountingEntryRepository
+          .createQueryBuilder('asiento')
+          .leftJoinAndSelect('asiento.lineItems', 'lineItems')  // ← Carga los items
+          .where('asiento.empresa_id = :empresaId', { empresaId });
+      
+        if (from) query.andWhere('asiento.fecha_emision >= :from', { from });
+        if (to) query.andWhere('asiento.fecha_emision <= :to', { to });
+      
+        return query.getMany();
+      }
+
+    private processEntryItems(entries: Asiento[], accountValues: Record<string, any>) {
+        if (!entries || !accountValues) {
+            console.error('Datos inválidos:', { entries, accountValues });
+            return;
+        }
+    
+        entries.forEach((entry, i) => {
+            if (!entry.lineItems) {
+                console.error(`Entry ${i} no tiene lineItems:`, entry);
+                return;
+            }
+    
+            entry.lineItems.forEach((item, j) => {
+                const accountCode = item.cta;
+                if (!accountCode) {
+                    console.error(`Item ${j} en entry ${i} no tiene cta:`, item);
+                    return;
+                }
+    
+                if (!accountValues[accountCode]) {
+                    console.warn(`Cuenta ${accountCode} no encontrada en accountValues`);
+                    return;
+                }
+    
+                // Asegúrate que los campos existen
+                accountValues[accountCode].saldoAnteriorDebe += Number(item.debe) || 0;
+                accountValues[accountCode].saldoAnteriorHaber += Number(item.haber) || 0;
+            });
+        });
+    }
+
+    private buildAccountHierarchy(accounts: AccountingPlan[], filter: (code: string) => boolean) {
+        const hierarchy: Record<string, any> = {};
+
+        accounts.filter(account => filter(account.code)).forEach(account => {
+            const code = account.code;
+            const parts = code.split('.').filter(Boolean);
+            const level = parts.length;
+            const isRoot = ['1.', '2.', '3.', '4.', '5.'].includes(code);
+            
+            hierarchy[code] = {
+                code,
+                name: account.name,
+                children: [],
+                parent: null,
+                level,
+                isAsset: code.startsWith('1'),
+                isLiability: code.startsWith('2'),
+                isEquity: code.startsWith('3'),
+                isIncome: code.startsWith('4'),
+                isExpense: code.startsWith('5'),
+                canHaveChildren: code.endsWith('.'),
+                isRoot
+            };
+
+            if (level > 1) {
+                const parentCode = parts.slice(0, -1).join('.') + '.';
+                if (hierarchy[parentCode]?.canHaveChildren) {
+                    hierarchy[parentCode].children.push(code);
+                    hierarchy[code].parent = parentCode;
+                }
+            }
+        });
+
+        return hierarchy;
+    }
 
     async getProfitAndLoss(
         empresaId: number,
@@ -22,115 +129,31 @@ export class ReportesService {
         endDate?: Date,
         level?: number | 'All'
     ) {
-        // Default dates if not provided
         const fromDate = startDate || new Date(new Date().getFullYear(), 0, 1);
         const toDate = endDate || new Date();
 
-        const formatDate = (date) => date.toISOString().split('T')[0];
-        const formatfromDate = formatDate(fromDate);
-        const formattoDate = formatDate(toDate);
-
-        // Get all account plans for this company
-        const accountPlans = await this.accountPlanRepository.find({
-            where: { empresa_id: empresaId },
-            order: { code: 'ASC' },
-        });
-
-        // Filtrar solo cuentas 4.x y 5.x
-        const filteredAccounts = accountPlans.filter(account =>
+        const accountPlans = await this.getAccountPlans(empresaId, account => 
             account.code.startsWith('4') || account.code.startsWith('5')
         );
 
-        // Get all entries for TOTAL values (from beginning of period to endDate)
-        const totalEntries = await this.accountingEntryRepository.find({
-            where: {
-                empresa_id: empresaId,
-                fecha_emision: Between(formatDate(new Date(0)), formattoDate),
-            },
-            relations: ['lineItems'],
-        });
+        const [totalEntries, monthlyEntries] = await Promise.all([
+            this.getAccountingEntries(empresaId, { to: toDate }),
+            this.getAccountingEntries(empresaId, { from: fromDate, to: toDate })
+        ]);
 
-        // Get all entries for MONTHLY values (between startDate and endDate)
-        const monthlyEntries = await this.accountingEntryRepository.find({
-            where: {
-                empresa_id: empresaId,
-                fecha_emision: Between(formatfromDate, formattoDate),
-            },
-            relations: ['lineItems'],
-        });
-
-        // Inicializar mapas para almacenar valores
         const accountValues = {
-            total: {},
-            monthly: {}
+            total: Object.fromEntries(accountPlans.map(a => [a.code, { debe: 0, haber: 0 }])),
+            monthly: Object.fromEntries(accountPlans.map(a => [a.code, { debe: 0, haber: 0 }]))
         };
 
-        filteredAccounts.forEach(account => {
-            accountValues.total[account.code] = { debe: 0, haber: 0 };
-            accountValues.monthly[account.code] = { debe: 0, haber: 0 };
-        });
+        this.processEntryItems(totalEntries, accountValues.total);
+        this.processEntryItems(monthlyEntries, accountValues.monthly);
 
-        // Procesar asientos para valores TOTALES
-        totalEntries.forEach(entry => {
-            entry.lineItems.forEach(item => {
-                const accountCode = item.cta;
-                if (accountValues.total[accountCode]) {
-                    const debe = typeof item.debe === 'string' ? parseFloat(item.debe) : (item.debe || 0);
-                    const haber = typeof item.haber === 'string' ? parseFloat(item.haber) : (item.haber || 0);
+        const accountHierarchy = this.buildAccountHierarchy(accountPlans, code => 
+            code.startsWith('4') || code.startsWith('5')
+        );
 
-                    accountValues.total[accountCode].debe += debe;
-                    accountValues.total[accountCode].haber += haber;
-                }
-            });
-        });
-
-        // Procesar asientos para valores MENSUALES
-        monthlyEntries.forEach(entry => {
-            entry.lineItems.forEach(item => {
-                const accountCode = item.cta;
-                if (accountValues.monthly[accountCode]) {
-                    const debe = typeof item.debe === 'string' ? parseFloat(item.debe) : (item.debe || 0);
-                    const haber = typeof item.haber === 'string' ? parseFloat(item.haber) : (item.haber || 0);
-
-                    accountValues.monthly[accountCode].debe += debe;
-                    accountValues.monthly[accountCode].haber += haber;
-                }
-            });
-        });
-
-        // Crear mapa de jerarquía de cuentas
-        const accountHierarchy = {};
-        filteredAccounts.forEach(account => {
-            const code = account.code;
-            accountHierarchy[code] = {
-                code: code,
-                name: account.name,
-                children: [],
-                parent: null,
-                level: code.split('.').filter(Boolean).length,
-                isIncome: code.startsWith('4'),
-                isExpense: code.startsWith('5'),
-                canHaveChildren: code.endsWith('.'),
-                isRoot: code === '4.' || code === '5.' // Identificar cuentas raíz
-            };
-        });
-
-        // Establecer relaciones padre-hijo
-        filteredAccounts.forEach(account => {
-            const code = account.code;
-            const parts = code.split('.').filter(Boolean);
-            if (parts.length > 1) {
-                let parentParts = parts.slice(0, -1);
-                let parentCode = parentParts.join('.') + '.';
-                if (accountHierarchy[parentCode] && accountHierarchy[parentCode].canHaveChildren) {
-                    accountHierarchy[parentCode].children.push(code);
-                    accountHierarchy[code].parent = parentCode;
-                }
-            }
-        });
-
-        // Función para calcular saldo incluyendo hijos
-        const calculateAccountBalance = (accountCode, valueType: 'total' | 'monthly') => {
+        const calculateAccountBalance = (accountCode: string, valueType: 'total' | 'monthly') => {
             const account = accountHierarchy[accountCode];
             if (!account) return { debe: 0, haber: 0 };
 
@@ -139,7 +162,7 @@ export class ReportesService {
             let totalHaber = directValues.haber;
 
             if (account.canHaveChildren) {
-                account.children.forEach(childCode => {
+                account.children.forEach((childCode: string) => {
                     const childBalance = calculateAccountBalance(childCode, valueType);
                     totalDebe += childBalance.debe;
                     totalHaber += childBalance.haber;
@@ -149,27 +172,21 @@ export class ReportesService {
             return { debe: totalDebe, haber: totalHaber };
         };
 
-        // Función para verificar si una cuenta tiene hijos con valores
-        const hasChildrenWithValues = (accountCode, valueType: 'total' | 'monthly') => {
+        const hasChildrenWithValues = (accountCode: string, valueType: 'total' | 'monthly') => {
             const account = accountHierarchy[accountCode];
-            if (!account || !account.canHaveChildren) return false;
-
-            return account.children.some(childCode => {
+            return account?.canHaveChildren && account.children.some((childCode: string) => {
                 const childBalance = calculateAccountBalance(childCode, valueType);
-                const childValue = accountHierarchy[childCode].isIncome
-                    ? childBalance.haber - childBalance.debe
+                const childValue = account.isIncome 
+                    ? childBalance.haber - childBalance.debe 
                     : childBalance.debe - childBalance.haber;
-
                 return childValue !== 0 || hasChildrenWithValues(childCode, valueType);
             });
         };
 
-        // Función para determinar si mostrar la cuenta
-        const shouldIncludeAccount = (accountCode) => {
+        const shouldIncludeAccount = (accountCode: string) => {
             const account = accountHierarchy[accountCode];
             if (!account) return false;
 
-            // Calcular valores para monthly y total
             const monthlyBalance = calculateAccountBalance(accountCode, 'monthly');
             const totalBalance = calculateAccountBalance(accountCode, 'total');
 
@@ -181,87 +198,60 @@ export class ReportesService {
                 ? totalBalance.haber - totalBalance.debe
                 : totalBalance.debe - totalBalance.haber;
 
-            // Si es cuenta raíz, siempre incluir
-            if (account.isRoot) return true;
-
-            // Si tiene valores distintos de cero, incluir
-            if (monthlyValue !== 0 || totalValue !== 0) return true;
-
-            // Si es header y tiene hijos con valores, incluir
-            if (account.canHaveChildren &&
-                (hasChildrenWithValues(accountCode, 'monthly') || hasChildrenWithValues(accountCode, 'total'))) {
-                return true;
-            }
-
-            return false;
+            return account.isRoot || monthlyValue !== 0 || totalValue !== 0 || (account.canHaveChildren && (hasChildrenWithValues(accountCode, 'monthly') || hasChildrenWithValues(accountCode, 'total')));
         };
 
-        // Construir el reporte
-        const report = [];
+        const report: ProfitAndLossItem[] = [];
         let totalIncomeMonthly = 0;
         let totalExpenseMonthly = 0;
         let totalIncomeTotal = 0;
         let totalExpenseTotal = 0;
 
-        // Procesar primero ingresos (4.) y luego gastos (5.)
-        ['4.', '5.'].forEach(rootCode => {
-            if (!accountHierarchy[rootCode]) return;
+        const processAccount = (accountCode: string) => {
+            const account = accountHierarchy[accountCode];
+            if (!account || !shouldIncludeAccount(accountCode)) return;
 
-            const processAccount = (accountCode) => {
-                const account = accountHierarchy[accountCode];
-                if (!account || !shouldIncludeAccount(accountCode)) return;
+            const monthlyBalance = calculateAccountBalance(accountCode, 'monthly');
+            const totalBalance = calculateAccountBalance(accountCode, 'total');
 
-                // Calcular balances
-                const monthlyBalance = calculateAccountBalance(accountCode, 'monthly');
-                const totalBalance = calculateAccountBalance(accountCode, 'total');
+            let monthlyValue, totalValue;
+            if (account.isIncome) {
+                monthlyValue = monthlyBalance.haber - monthlyBalance.debe;
+                totalValue = totalBalance.haber - totalBalance.debe;
 
-                // Calcular valores según tipo de cuenta
-                let monthlyValue, totalValue;
-                if (account.isIncome) {
-                    monthlyValue = monthlyBalance.haber - monthlyBalance.debe;
-                    totalValue = totalBalance.haber - totalBalance.debe;
-
-                    // Acumular para cálculo de NET
-                    if (!account.canHaveChildren) {
-                        totalIncomeMonthly += monthlyValue;
-                        totalIncomeTotal += totalValue;
-                    }
-                } else {
-                    monthlyValue = monthlyBalance.debe - monthlyBalance.haber;
-                    totalValue = totalBalance.debe - totalBalance.haber;
-
-                    // Acumular para cálculo de NET
-                    if (!account.canHaveChildren) {
-                        totalExpenseMonthly += monthlyValue;
-                        totalExpenseTotal += totalValue;
-                    }
+                if (!account.canHaveChildren) {
+                    totalIncomeMonthly += monthlyValue;
+                    totalIncomeTotal += totalValue;
                 }
+            } else {
+                monthlyValue = monthlyBalance.debe - monthlyBalance.haber;
+                totalValue = totalBalance.debe - totalBalance.haber;
 
-                // Agregar al reporte
-                report.push({
-                    code: accountCode,
-                    name: account.name,
-                    level: account.level,
-                    monthly: monthlyValue,
-                    total: totalValue,
-                    isHeader: account.canHaveChildren,
-                    isIncome: account.isIncome,
-                    isExpense: account.isExpense
-                });
-
-                // Procesar hijos si es header
-                if (account.canHaveChildren) {
-                    account.children.forEach(childCode => processAccount(childCode));
+                if (!account.canHaveChildren) {
+                    totalExpenseMonthly += monthlyValue;
+                    totalExpenseTotal += totalValue;
                 }
-            };
+            }
 
-            processAccount(rootCode);
-        });
+            report.push({
+                code: accountCode,
+                name: account.name,
+                level: account.level,
+                monthly: monthlyValue,
+                total: totalValue,
+                isHeader: account.canHaveChildren,
+                isIncome: account.isIncome,
+                isExpense: account.isExpense
+            });
 
-        // Ordenar el reporte por código
+            if (account.canHaveChildren) {
+                account.children.forEach(processAccount);
+            }
+        };
+
+        ['4.', '5.'].forEach(rootCode => accountHierarchy[rootCode] && processAccount(rootCode));
         report.sort((a, b) => a.code.localeCompare(b.code));
 
-        // Calcular NET solo si hay valores
         const netMonthly = totalIncomeMonthly - totalExpenseMonthly;
         const netTotal = totalIncomeTotal - totalExpenseTotal;
 
@@ -279,9 +269,9 @@ export class ReportesService {
         }
 
         return {
-            report: report,
-            startDate: fromDate.toISOString().split('T')[0],
-            endDate: toDate.toISOString().split('T')[0],
+            report,
+            startDate: this.formatDateToISO(fromDate),
+            endDate: this.formatDateToISO(toDate),
             level: level || 'All',
         };
     }
@@ -291,81 +281,22 @@ export class ReportesService {
         endDate?: Date,
         level?: number | 'All'
     ) {
-        // Definir fecha de corte
         const toDate = endDate || new Date();
-        const formatToDate = toDate.toISOString().split('T')[0];
+        const formatToDate = this.formatDateToISO(toDate);
 
-        // Obtener todas las cuentas de la empresa
-        const accountPlans = await this.accountPlanRepository.find({
-            where: { empresa_id: empresaId },
-            order: { code: 'ASC' },
-        });
-
-        // Filtrar cuentas por Activos, Pasivos y Patrimonio
-        const filteredAccounts = accountPlans.filter(account =>
+        const accountPlans = await this.getAccountPlans(empresaId, account => 
             account.code.startsWith('1') || account.code.startsWith('2') || account.code.startsWith('3')
         );
 
-        // Obtener los asientos contables hasta la fecha seleccionada
-        const entries = await this.accountingEntryRepository.find({
-            where: {
-                empresa_id: empresaId,
-                fecha_emision: LessThanOrEqual(new Date(`${formatToDate}T23:59:59.999Z`)),
-            },
-            relations: ['lineItems'],
-        });
+        const entries = await this.getAccountingEntries(empresaId, { to: toDate });
 
-        // Mapa de valores para cada cuenta (Debe y Haber)
-        const accountValues: Record<string, { debe: number; haber: number }> = {};
+        const accountValues = Object.fromEntries(accountPlans.map(a => [a.code, { debe: 0, haber: 0 }]));
+        this.processEntryItems(entries, accountValues);
 
-        // Inicializar cuentas con valores en 0
-        filteredAccounts.forEach(account => {
-            accountValues[account.code] = { debe: 0, haber: 0 };
-        });
+        const accountHierarchy = this.buildAccountHierarchy(accountPlans, code => 
+            code.startsWith('1') || code.startsWith('2') || code.startsWith('3')
+        );
 
-        // Procesar los asientos contables
-        entries.forEach(entry => {
-            entry.lineItems.forEach(item => {
-                const accountCode = item.cta;
-                if (accountValues[accountCode]) {
-                    accountValues[accountCode].debe += Number(item.debe) || 0;
-                    accountValues[accountCode].haber += Number(item.haber) || 0;
-                }
-            });
-        });
-
-        // Mapa de jerarquía de cuentas
-        const accountHierarchy: Record<string, any> = {};
-        filteredAccounts.forEach(account => {
-            accountHierarchy[account.code] = {
-                code: account.code,
-                name: account.name,
-                children: [],
-                parent: null,
-                level: account.code.split('.').filter(Boolean).length,
-                isAsset: account.code.startsWith('1'),
-                isLiability: account.code.startsWith('2'),
-                isEquity: account.code.startsWith('3'),
-                canHaveChildren: account.code.endsWith('.'),
-                isRoot: account.code === '1.' || account.code === '2.' || account.code === '3.' // Cuentas raíz
-            };
-        });
-
-        // Establecer relaciones padre-hijo
-        filteredAccounts.forEach(account => {
-            const code = account.code;
-            const parts = code.split('.').filter(Boolean);
-
-            if (parts.length > 1) {
-                const parentCode = parts.slice(0, -1).join('.') + '.';
-                if (accountHierarchy[parentCode] && accountHierarchy[parentCode].canHaveChildren) {
-                    accountHierarchy[parentCode].children.push(code);
-                    accountHierarchy[code].parent = parentCode;
-                }
-            }
-        });
-
-        // Función para calcular el saldo total de una cuenta
         const calculateAccountBalance = (accountCode: string) => {
             const account = accountHierarchy[accountCode];
             if (!account) return { debe: 0, haber: 0 };
@@ -373,7 +304,7 @@ export class ReportesService {
             let { debe, haber } = accountValues[accountCode] || { debe: 0, haber: 0 };
 
             if (account.canHaveChildren) {
-                account.children.forEach(childCode => {
+                account.children.forEach((childCode: string) => {
                     const childBalance = calculateAccountBalance(childCode);
                     debe += childBalance.debe;
                     haber += childBalance.haber;
@@ -383,77 +314,47 @@ export class ReportesService {
             return { debe, haber };
         };
 
-        // Función para verificar si una cuenta tiene valores o hijos con valores
         const hasValueOrChildrenWithValues = (accountCode: string): boolean => {
             const account = accountHierarchy[accountCode];
             if (!account) return false;
-
-            // Si es cuenta raíz, siempre incluir
             if (account.isRoot) return true;
 
             const balance = calculateAccountBalance(accountCode);
-            let value = 0;
+            const value = account.isAsset 
+                ? balance.debe - balance.haber 
+                : balance.haber - balance.debe;
 
-            if (account.isAsset) {
-                value = balance.debe - balance.haber;
-            } else if (account.isLiability || account.isEquity) {
-                value = balance.haber - balance.debe;
-            }
-
-            // Si tiene valor distinto de cero, incluir
-            if (value !== 0) return true;
-
-            // Si es header y tiene hijos con valores, incluir
-            if (account.canHaveChildren) {
-                return account.children.some(childCode => hasValueOrChildrenWithValues(childCode));
-            }
-
-            return false;
+            return value !== 0 || (account.canHaveChildren && 
+                account.children.some((childCode: string) => hasValueOrChildrenWithValues(childCode)));
         };
 
-        // Función recursiva para construir el reporte
         const buildReport = (accountCode: string, targetLevel: number | 'All') => {
             const account = accountHierarchy[accountCode];
             if (!account || !hasValueOrChildrenWithValues(accountCode)) return [];
 
             const reportItems = [];
             const balance = calculateAccountBalance(accountCode);
+            const value = account.isAsset 
+                ? balance.debe - balance.haber 
+                : balance.haber - balance.debe;
 
-            // Calcular el valor de la cuenta según su tipo
-            let value;
-            if (account.isAsset) {
-                value = balance.debe - balance.haber;
-            } else if (account.isLiability || account.isEquity) {
-                value = balance.haber - balance.debe;
-            } else {
-                value = 0;
-            }
+            const isHeader = account.canHaveChildren && (targetLevel === 'All' || account.level < targetLevel);
 
-            // Determinar si es header según el nivel
-            const isHeader = account.canHaveChildren &&
-                (targetLevel === 'All' || account.level < targetLevel);
-
-            // Solo incluir si:
-            // 1. Es cuenta raíz (1., 2., 3.) O
-            // 2. Tiene valor distinto de cero O
-            // 3. Es header con hijos que tienen valores
-            if (account.isRoot || value !== 0 || (isHeader && account.children.some(childCode => hasValueOrChildrenWithValues(childCode)))) {
+            if (account.isRoot || value !== 0 || (isHeader && account.children.some(hasValueOrChildrenWithValues))) {
                 reportItems.push({
                     code: accountCode,
                     name: account.name,
                     level: account.level,
                     total: value,
-                    isHeader: isHeader,
+                    isHeader,
                     isAsset: account.isAsset,
                     isLiability: account.isLiability,
                     isEquity: account.isEquity
                 });
 
-                // Procesar hijos si es header
                 if (isHeader) {
-                    account.children.forEach(childCode => {
-                        const childItems = buildReport(childCode, targetLevel);
-                        reportItems.push(...childItems);
+                    account.children.forEach((childCode: string) => {
+                        reportItems.push(...buildReport(childCode, targetLevel));
                     });
                 }
             }
@@ -461,38 +362,56 @@ export class ReportesService {
             return reportItems;
         };
 
-        // Construir el reporte para cada categoría principal
         const report = [
             ...buildReport('1.', level || 'All'),
             ...buildReport('2.', level || 'All'),
             ...buildReport('3.', level || 'All')
-        ];
+        ].sort((a, b) => a.code.localeCompare(b.code));
 
-        // Ordenar reporte por código
-        report.sort((a, b) => a.code.localeCompare(b.code));
-
-        // Calcular totales solo con las cuentas principales (1., 2., 3.)
         const totalAssets = calculateAccountBalance('1.').debe - calculateAccountBalance('1.').haber;
         const totalLiabilities = calculateAccountBalance('2.').haber - calculateAccountBalance('2.').debe;
         const totalEquity = calculateAccountBalance('3.').haber - calculateAccountBalance('3.').debe;
 
-        // Agregar líneas de resumen solo si hay valores
         if (totalAssets !== 0 || totalLiabilities !== 0 || totalEquity !== 0) {
             report.push(
-                { code: 'TOTALPYP', name: 'TOTAL PASIVOS + PATRIMONIO', level: 0, total: totalLiabilities + totalEquity, isHeader: true },
-                { code: 'NET', name: 'UTILIDAD O PÉRDIDA', level: 0, total: totalAssets - totalLiabilities - totalEquity, isHeader: true },
-                { code: 'TOTALPYPNET', name: 'TOTAL PASIVOS + PATRIMONIO + NET', level: 0, total: (totalLiabilities + totalEquity) + (totalAssets - totalLiabilities - totalEquity), isHeader: true }
+                { 
+                    code: 'TOTALPYP', 
+                    name: 'TOTAL PASIVOS + PATRIMONIO', 
+                    level: 0, 
+                    total: totalLiabilities + totalEquity, 
+                    isHeader: true,
+                    isAsset: false,
+                    isLiability: false,
+                    isEquity: false
+                },
+                {
+                    code: 'NET', 
+                    name: 'UTILIDAD O PÉRDIDA', 
+                    level: 0, 
+                    total: totalAssets - totalLiabilities - totalEquity, 
+                    isHeader: true,
+                    isAsset: false,
+                    isLiability: false,
+                    isEquity: false
+                },
+                {
+                    code: 'TOTALPYPNET', 
+                    name: 'TOTAL PASIVOS + PATRIMONIO + NET', 
+                    level: 0, 
+                    total: (totalLiabilities + totalEquity) + (totalAssets - totalLiabilities - totalEquity), 
+                    isHeader: true,
+                    isAsset: false,
+                    isLiability: false,
+                    isEquity: false
+                }
             );
         }
-
-        // Verificación de ecuación contable
-        const balanceCorrecto = Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 0.01;
 
         return {
             report,
             endDate: formatToDate,
             level: level || 'All',
-            balanceCorrecto,
+            balanceCorrecto: Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 0.01,
         };
     }
 
@@ -502,19 +421,16 @@ export class ReportesService {
         fechaHasta?: Date | string,
         codigoTransaccion?: string
     ) {
-        // Validar fechas
         if (!fechaDesde || !fechaHasta) {
-            throw new Error('Debe proporcionar fechas de inicio y fin');
+            throw new BadRequestException('Debe proporcionar fechas de inicio y fin');
         }
 
-        // Ajustar fechas
         const fromDate = new Date(fechaDesde);
         fromDate.setUTCHours(0, 0, 0, 0);
 
         const toDate = new Date(fechaHasta);
         toDate.setUTCHours(23, 59, 59, 999);
 
-        // Crear condiciones de búsqueda
         const where: any = {
             empresa_id: empresaId,
             fecha_emision: Between(fromDate, toDate),
@@ -524,26 +440,24 @@ export class ReportesService {
             where.codigo_transaccion = Like(`%${codigoTransaccion}%`);
         }
 
-        // Obtener asientos
         const asientos = await this.accountingEntryRepository.find({
             where,
             relations: ['lineItems'],
-            order: {
-                fecha_emision: 'ASC',
-                nro_asiento: 'ASC',
-            },
+            order: { fecha_emision: 'ASC', nro_asiento: 'ASC' },
         });
 
-        // Formatear respuesta
         const asientosFormateados = asientos.map(asiento => {
             const items = asiento.lineItems.map(item => ({
                 cta: item.cta,
                 cta_nombre: item.cta_nombre,
                 codigo_centro: item.codigo_centro || '',
-                debe: typeof item.debe === 'string' ? parseFloat(item.debe) : Number(item.debe) || 0,
-                haber: typeof item.haber === 'string' ? parseFloat(item.haber) : Number(item.haber) || 0,
+                debe: Number(item.debe) || 0,
+                haber: Number(item.haber) || 0,
                 nota: item.nota || '',
             }));
+
+            const total_debe = items.reduce((sum, item) => sum + item.debe, 0);
+            const total_haber = items.reduce((sum, item) => sum + item.haber, 0);
 
             return {
                 id: asiento.id,
@@ -552,16 +466,14 @@ export class ReportesService {
                 codigo_transaccion: asiento.codigo_transaccion,
                 comentario: asiento.comentario || '',
                 nro_referencia: asiento.nro_referencia || '',
-                total_debe: items.reduce((sum, item) => sum + item.debe, 0),
-                total_haber: items.reduce((sum, item) => sum + item.haber, 0),
+                total_debe,
+                total_haber,
                 items,
             };
         });
 
-        // Calcular totales generales
         const totalDebe = asientosFormateados.reduce((sum, asiento) => sum + asiento.total_debe, 0);
         const totalHaber = asientosFormateados.reduce((sum, asiento) => sum + asiento.total_haber, 0);
-        const totalDiferencia = Math.abs(totalDebe - totalHaber);
 
         return {
             asientos: asientosFormateados,
@@ -570,12 +482,8 @@ export class ReportesService {
             codigoTransaccion: codigoTransaccion || null,
             totalDebe,
             totalHaber,
-            totalDiferencia,
+            totalDiferencia: Math.abs(totalDebe - totalHaber),
         };
-    }
-
-    private formatDateToISO(date: Date): string {
-        return date.toISOString().split('T')[0];
     }
 
     async getMayorGeneral(
@@ -586,8 +494,6 @@ export class ReportesService {
         endDate?: Date,
         transaction?: string,
     ) {
-
-        // Obtener saldo anterior agrupado por cuenta
         const saldoAnteriorPorCuenta = await this.obtenerSaldosAnteriores(
             empresaId,
             startDate,
@@ -595,7 +501,6 @@ export class ReportesService {
             finalAccount,
         );
 
-        // Obtener los movimientos dentro del rango
         const query = this.accountingEntryItemRepository
             .createQueryBuilder('item')
             .innerJoinAndSelect('item.asiento', 'asiento')
@@ -632,19 +537,6 @@ export class ReportesService {
             .addOrderBy('asiento.nro_asiento', 'ASC')
             .getMany();
 
-        // console.log('Resultados de la consulta:', {
-        //     parameters: {
-        //         empresaId,
-        //         initialAccount,
-        //         finalAccount,
-        //         startDate: startDate?.toISOString(),
-        //         endDate: endDate?.toISOString(),
-        //         transaction
-        //     },
-        //     itemsCount: items.length,
-        //     firstItems: items.slice(0, 4)
-        // });
-
         return this.groupByCuenta(items, saldoAnteriorPorCuenta);
     }
 
@@ -653,8 +545,7 @@ export class ReportesService {
         startDate?: Date,
         initialAccount?: string,
         finalAccount?: string,
-    ): Promise<Record<string, number>> {
-
+    ) {
         if (!startDate) return {};
 
         const query = this.accountingEntryItemRepository
@@ -675,62 +566,46 @@ export class ReportesService {
             });
         }
 
-        query.groupBy('item.cta');
+        const resultados = await query.groupBy('item.cta').getRawMany();
 
-        const resultados = await query.getRawMany();
-
-        const saldos: Record<string, number> = {};
-        for (const row of resultados) {
-            const cuenta = row.cuenta;
-            const debe = parseFloat(row.totalDebe || 0);
-            const haber = parseFloat(row.totalHaber || 0);
-            saldos[cuenta] = debe - haber;
-        }
-        return saldos;
+        return resultados.reduce((saldos, row) => {
+            saldos[row.cuenta] = parseFloat(row.totalDebe || 0) - parseFloat(row.totalHaber || 0);
+            return saldos;
+        }, {});
     }
 
-    private groupByCuenta(
-        items: AsientoItem[],
-        saldoAnteriorPorCuenta: Record<string, number> = {},
-    ) {
-        const resultado = {};
+    private groupByCuenta(items: AsientoItem[], saldoAnteriorPorCuenta: Record<string, number> = {}) {
+        const resultado: Record<string, any> = {};
 
-        for (const item of items) {
+        items.forEach(item => {
             const cuentaClave = `${item.cta} ${item.cta_nombre}`;
             if (!resultado[cuentaClave]) {
-                const saldoInicial = saldoAnteriorPorCuenta[item.cta] || 0;
                 resultado[cuentaClave] = {
                     cuenta: cuentaClave,
                     movimientos: [],
-                    saldoInicial,
+                    saldoInicial: saldoAnteriorPorCuenta[item.cta] || 0,
                 };
             }
 
             const asiento = item.asiento;
-            const movimiento = {
+            resultado[cuentaClave].movimientos.push({
                 fecha: asiento.fecha_emision,
                 nro_asiento: asiento.nro_asiento,
                 descripcion: asiento.comentario,
                 nota: item.nota,
                 debe: Number(item.debe),
                 haber: Number(item.haber),
-            };
+            });
+        });
 
-            resultado[cuentaClave].movimientos.push(movimiento);
-        }
-
-        // Calcular saldo acumulado
-        for (const cuenta in resultado) {
-            let saldo = resultado[cuenta].saldoInicial;
-            resultado[cuenta].movimientos = resultado[cuenta].movimientos.map(
-                (m) => {
-                    saldo += m.debe - m.haber;
-                    return { ...m, saldo };
-                },
-            );
-        }
-
-        return Object.values(resultado); // Devuelve array de cuentas con sus movimientos
+        return Object.values(resultado).map((cuenta: any) => {
+            let saldo = cuenta.saldoInicial;
+            cuenta.movimientos = cuenta.movimientos.map((m: any) => {
+                saldo += m.debe - m.haber;
+                return { ...m, saldo };
+            });
+            return cuenta;
+        });
     }
 
     async getBalanceComprobacion(
@@ -741,144 +616,85 @@ export class ReportesService {
         finalAccount?: string,
         level?: number
     ) {
-        // Validar fechas
         if (!startDate || !endDate) {
             throw new BadRequestException('Debe proporcionar fechas de inicio y fin');
         }
 
-        // Ajustar fechas para incluir todo el día
         const fromDate = new Date(startDate);
         fromDate.setUTCHours(0, 0, 0, 0);
 
         const toDate = new Date(endDate);
         toDate.setUTCHours(23, 59, 59, 999);
 
-        const formatDate = (date: Date) => date.toISOString().split('T')[0];
-        const formatFromDate = formatDate(fromDate);
-        const formatToDate = formatDate(toDate);
-
-        // Obtener todas las cuentas del plan contable
-        const accountPlans = await this.accountPlanRepository.find({
-            where: { empresa_id: empresaId },
-            order: { code: 'ASC' },
-        });
-
-        // Filtrar cuentas por rango si se especifica
+        const accountPlans = await this.getAccountPlans(empresaId);
         let filteredAccounts = accountPlans;
+
         if (initialAccount && finalAccount) {
             filteredAccounts = accountPlans.filter(account =>
                 account.code >= initialAccount && account.code <= finalAccount
             );
         }
+        
 
-        // Filtrar por nivel si se especifica
         if (level) {
             filteredAccounts = filteredAccounts.filter(account =>
                 account.code.split('.').filter(Boolean).length <= level
             );
         }
 
-        // 1. Obtener SALDO ANTERIOR (suma de todos los movimientos hasta 1 día antes de startDate)
-        const saldoAnteriorEntries = await this.accountingEntryRepository.find({
-            where: {
-                empresa_id: empresaId,
-                fecha_emision: LessThan(fromDate),
-            },
-            relations: ['lineItems'],
-        });
+        const [saldoAnteriorEntries, movimientosEntries] = await Promise.all([
+            this.getAccountingEntries(empresaId, { to: fromDate }),
+            this.getAccountingEntries(empresaId, { from: fromDate, to: toDate })
+        ]);
 
+        const accountValues: Record<string, any> = {};
 
-
-        // 2. Obtener MOVIMIENTOS (transacciones entre las fechas seleccionadas)
-        const movimientosEntries = await this.accountingEntryRepository.find({
-            where: {
-                empresa_id: empresaId,
-                fecha_emision: Between(fromDate, toDate),
-            },
-            relations: ['lineItems'],
-        });
-
-        // Inicializar estructura para almacenar valores
-        const accountValues: Record<string, {
-            saldoAnteriorDebe: number;
-            saldoAnteriorHaber: number;
-            movimientosDebe: number;
-            movimientosHaber: number;
-            tipoCuenta: 'activo' | 'pasivo' | 'patrimonio' | 'ingreso' | 'gasto';
-        }> = {};
-
-        // Clasificar cuentas y inicializar valores
         filteredAccounts.forEach(account => {
-            const tipo = this.clasificarTipoCuenta(account.code);
             accountValues[account.code] = {
                 saldoAnteriorDebe: 0,
                 saldoAnteriorHaber: 0,
                 movimientosDebe: 0,
                 movimientosHaber: 0,
-                tipoCuenta: tipo
+                tipoCuenta: this.clasificarTipoCuenta(account.code)
             };
-        });
+        });       
+        
+
+        this.processEntryItems(saldoAnteriorEntries, accountValues);
+        this.processEntryItems(movimientosEntries, accountValues);
 
 
-        // Procesar SALDO ANTERIOR
-        saldoAnteriorEntries.forEach(entry => {
-            entry.lineItems.forEach(item => {
-                if (accountValues[item.cta]) {
-                    accountValues[item.cta].saldoAnteriorDebe += Number(item.debe) || 0;
-                    accountValues[item.cta].saldoAnteriorHaber += Number(item.haber) || 0;
-                }
-            });
-        });
-
-        // Procesar MOVIMIENTOS
-        movimientosEntries.forEach(entry => {
-            entry.lineItems.forEach(item => {
-                if (accountValues[item.cta]) {
-                    accountValues[item.cta].movimientosDebe += Number(item.debe) || 0;
-                    accountValues[item.cta].movimientosHaber += Number(item.haber) || 0;
-                }
-            });
-        });
-
-        // Calcular SALDOS según tipo de cuenta
-        const reportItems = [];
-        let totalSaldoAnteriorDebe = 0;
-        let totalSaldoAnteriorHaber = 0;
-        let totalMovimientosDebe = 0;
-        let totalMovimientosHaber = 0;
-        let totalSaldosDebe = 0;
-        let totalSaldosHaber = 0;
+        const reportItems: { codigo: string; nombre: string; saldoAnteriorDebe: any; saldoAnteriorHaber: any; movimientosDebe: any; movimientosHaber: any; saldoDebe: number; saldoHaber: number; tipoCuenta: any; level: number; }[] = [];
+        let totals = {
+            saldoAnteriorDebe: 0,
+            saldoAnteriorHaber: 0,
+            movimientosDebe: 0,
+            movimientosHaber: 0,
+            saldosDebe: 0,
+            saldosHaber: 0
+        };
 
         filteredAccounts.forEach(account => {
             const values = accountValues[account.code];
             const tipo = values.tipoCuenta;
 
-            // Calcular saldos según tipo de cuenta
             let saldoDebe = 0;
             let saldoHaber = 0;
 
             if (tipo === 'activo' || tipo === 'gasto') {
-                // Para activos y gastos: (saldo anterior - haber + debe)
                 const saldoAnterior = values.saldoAnteriorDebe - values.saldoAnteriorHaber;
                 const saldoMovimientos = -values.movimientosHaber + values.movimientosDebe;
                 const saldoFinal = saldoAnterior + saldoMovimientos;
 
-                if (saldoFinal > 0) {
-                    saldoDebe = saldoFinal;
-                } else {
-                    saldoHaber = Math.abs(saldoFinal);
-                }
-            } else { // pasivo, patrimonio, ingreso
-                // Para pasivos, patrimonio e ingresos: (saldo anterior + haber - debe)
+                if (saldoFinal > 0) saldoDebe = saldoFinal;
+                else saldoHaber = Math.abs(saldoFinal);
+            } else {
                 const saldoAnterior = values.saldoAnteriorHaber - values.saldoAnteriorDebe;
                 const saldoMovimientos = values.movimientosHaber - values.movimientosDebe;
                 const saldoFinal = saldoAnterior + saldoMovimientos;
 
-                if (saldoFinal > 0) {
-                    saldoHaber = saldoFinal;
-                } else {
-                    saldoDebe = Math.abs(saldoFinal);
-                }
+                if (saldoFinal > 0) saldoHaber = saldoFinal;
+                else saldoDebe = Math.abs(saldoFinal);
             }
 
             const tieneSaldo = saldoDebe !== 0 || saldoHaber !== 0 ||
@@ -886,14 +702,12 @@ export class ReportesService {
                 values.movimientosDebe !== 0 || values.movimientosHaber !== 0;
 
             if (tieneSaldo) {
-
-                // Acumular totales
-                totalSaldoAnteriorDebe += values.saldoAnteriorDebe;
-                totalSaldoAnteriorHaber += values.saldoAnteriorHaber;
-                totalMovimientosDebe += values.movimientosDebe;
-                totalMovimientosHaber += values.movimientosHaber;
-                totalSaldosDebe += saldoDebe;
-                totalSaldosHaber += saldoHaber;
+                totals.saldoAnteriorDebe += values.saldoAnteriorDebe;
+                totals.saldoAnteriorHaber += values.saldoAnteriorHaber;
+                totals.movimientosDebe += values.movimientosDebe;
+                totals.movimientosHaber += values.movimientosHaber;
+                totals.saldosDebe += saldoDebe;
+                totals.saldosHaber += saldoHaber;
 
                 reportItems.push({
                     codigo: account.code,
@@ -910,31 +724,18 @@ export class ReportesService {
             }
         });
 
+        
+
         return {
             report: reportItems,
-            startDate: formatFromDate,
-            endDate: formatToDate,
+            startDate: this.formatDateToISO(fromDate),
+            endDate: this.formatDateToISO(toDate),
             initialAccount,
             finalAccount,
             level,
-            totalSaldoAnteriorDebe,
-            totalSaldoAnteriorHaber,
-            totalMovimientosDebe,
-            totalMovimientosHaber,
-            totalSaldosDebe,
-            totalSaldosHaber,
-            diferenciaMovimientos: totalMovimientosDebe - totalMovimientosHaber,
-            diferenciaSaldos: totalSaldosDebe - totalSaldosHaber
+            ...totals,
+            diferenciaMovimientos: totals.movimientosDebe - totals.movimientosHaber,
+            diferenciaSaldos: totals.saldosDebe - totals.saldosHaber
         };
     }
-
-    private clasificarTipoCuenta(codigo: string): 'activo' | 'pasivo' | 'patrimonio' | 'ingreso' | 'gasto' {
-        if (codigo.startsWith('1')) return 'activo';
-        if (codigo.startsWith('2')) return 'pasivo';
-        if (codigo.startsWith('3')) return 'patrimonio';
-        if (codigo.startsWith('4')) return 'ingreso';
-        if (codigo.startsWith('5')) return 'gasto';
-        return 'activo'; // Por defecto
-    }
-
 }

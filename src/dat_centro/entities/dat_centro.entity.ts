@@ -5,22 +5,22 @@ import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 
 export class DatCentro {
 
      @PrimaryGeneratedColumn()
-     id: number;
+     id!: number;
 
      @Column({ nullable: false })
-     empresa_id: number;
+     empresa_id!: number;
 
-     @Column({ nullable: false, default: null }) 
-     codigo: string;
+     @Column({ nullable: false, default: null })
+     codigo!: string;
 
-     @Column({ nullable: true }) 
-     nombre: string;
+     @Column({ nullable: true })
+     nombre!: string;
 
-     @Column({ default: true  }) 
-     activo: boolean
+     @Column({ default: true })
+     activo!: boolean;
 
-     @CreateDateColumn({ name: 'created_at' })  // Fecha de creación automática
-     createdAt: Date;
+     @CreateDateColumn({ name: 'created_at' }) // Fecha de creación automática
+     createdAt!: Date;
      // @UpdateDateColumn({ name: 'updated_at' })  // Fecha de actualización automática
      // updatedAt: Date;
 }

@@ -4,29 +4,29 @@ import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, Index } from 
 @Index(['empresa_id', 'codigo_transaccion'], { unique: true })
 export class TransaccionContable {
 
-    @PrimaryGeneratedColumn() 
-    id: number;
+    @PrimaryGeneratedColumn()
+    id!: number;
 
     @Column({ nullable: false })
-    empresa_id: number;
+    empresa_id!: number;
 
-    @Column({ nullable: false, default: null }) 
-    codigo_transaccion: string;
+    @Column({ nullable: false, default: null })
+    codigo_transaccion!: string;
 
-    @Column({ nullable: true, default: null }) 
-    nombre: string;
+    @Column({ nullable: true, default: null })
+    nombre!: string;
 
-    @Column({ nullable: true, default: null }) 
-    secuencial: string;
+    @Column({ nullable: true, default: null })
+    secuencial!: string;
 
-    @Column({ nullable: true, default: 0 }) 
-    lectura: number;
+    @Column({ nullable: true, default: 0 })
+    lectura!: number;
 
-    @Column({ nullable: true, default: 0 }) 
-    activo: boolean;
+    @Column({ nullable: true, default: 0 })
+    activo!: boolean;
 
     @CreateDateColumn({ name: 'created_at' })
-    createdAt: Date;
+    createdAt!: Date;
 
     // @UpdateDateColumn({ 
     //     name: 'updated_at',

@@ -78,6 +78,8 @@ export class ReportesController {
         @Query('finalAccount') finalAccount?: string,
         @Query('level') level?: number,
     ) {
+        console.log(empresaId, startDate, endDate, initialAccount, finalAccount, level);
+        
         return this.reportsService.getBalanceComprobacion(
             empresaId,
             startDate ? new Date(startDate) : undefined,

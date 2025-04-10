@@ -5,45 +5,45 @@ import { AsientoItem } from './asiento-item.entity';
 @Index(['empresa_id'])
 export class Asiento {
   @PrimaryGeneratedColumn()
-  id: number;
+  id!: number;
 
   @Column({ nullable: false })
-  empresa_id: number;
+  empresa_id!: number;
 
   @Column({ type: 'date', nullable: true })
-  fecha_emision: Date;
+  fecha_emision!: Date;
 
   @Column({ nullable: true })
-  nro_asiento: string;
+  nro_asiento!: string;
 
   @Column({ nullable: true })
-  comentario: string;
+  comentario!: string;
 
   @Column()
-  codigo_transaccion: string;
+  codigo_transaccion!: string;
 
   @Column()
-  estado: string;
+  estado!: string;
 
   @Column({ nullable: true })
-  nro_referencia: string;
+  nro_referencia!: string;
 
   // @Column()
   // secuencial: string;
 
   @Column()
-  codigo_centro: string;
+  codigo_centro!: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
-  total_debe: number;
+  total_debe!: number;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
-  total_haber: number;
+  total_haber!: number;
 
   // Relación con AsientoItem
   @OneToMany(() => AsientoItem, (asientoItem) => asientoItem.asiento, {
     cascade: true,
     eager: false,
   })
-  lineItems: AsientoItem[];
+  lineItems!: AsientoItem[];
 }

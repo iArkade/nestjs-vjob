@@ -3,24 +3,24 @@ import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from "typeor
 @Entity({ name: "login-history" })
 export class LoginHistory {
      @PrimaryGeneratedColumn()
-     id: number;
+     id!: number;
 
      @Column()
-     ip: string;
+     ip!: string;
 
      @Column()
-     browser: string;
+     browser!: string;
 
      @Column()
-     os: string;
+     os!: string;
 
      @Column()
-     userId: number;
+     userId!: number;
 
      @Column()
-     userName: string;
+     userName!: string;
 
      @CreateDateColumn({ type: 'timestamp' })
-     timestamp: Date;
+     timestamp!: Date;
 
 }

@@ -8,7 +8,7 @@ export class CreateTransaccionContableDto {
         example: '1',
     })
     @IsString()
-    empresa_id: number;
+    empresa_id!: number;
 
     @ApiProperty({
         description: 'El codigo de la transaccion',
@@ -16,7 +16,7 @@ export class CreateTransaccionContableDto {
     })
     @IsNotEmpty()
     @IsString()
-    codigo_transaccion: string;
+    codigo_transaccion!: string;
 
     @ApiProperty({
         description: 'El nombre de la transaccion contable',
@@ -24,7 +24,7 @@ export class CreateTransaccionContableDto {
     })
     @IsNotEmpty()
     @IsString()
-    nombre: string;
+    nombre!: string;
 
     @ApiProperty({
         description: 'El secuencial de la transaccion contable',
@@ -32,7 +32,7 @@ export class CreateTransaccionContableDto {
     })
     @IsNotEmpty()
     @IsString()
-    secuencial: string;
+    secuencial!: string;
 
     @ApiProperty({
         description: '1 si es creada por default y 0 es creada manualmente(puede eliminar y editar)',
@@ -40,7 +40,7 @@ export class CreateTransaccionContableDto {
     })
     @IsNotEmpty()
     @IsBoolean()
-    lectura: number;
+    lectura!: number;
 
     @ApiProperty({
         description: '1 campo bloqueado y 0 campo no bloqueado)',
@@ -48,7 +48,7 @@ export class CreateTransaccionContableDto {
     })
     @IsNotEmpty()
     @IsBoolean()
-    activo: boolean;
+    activo!: boolean;
 
 
 }

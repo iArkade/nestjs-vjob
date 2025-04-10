@@ -1,6 +1,8 @@
 import {
     BadRequestException,
+    ConflictException,
     Injectable,
+    InternalServerErrorException,
     NotFoundException,
 } from '@nestjs/common';
 import { CreateEmpresaDto } from './dto/create-empresa.dto';
@@ -9,8 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Empresa } from './entities/empresa.entity';
 import { Repository } from 'typeorm';
 import { UsuarioEmpresa } from '../usuario_empresa/entities/usuario_empresa.entity';
-import { Usuario } from '../users/entities/user.entity';
-import { CompanyRole } from 'src/users/enums/role.enum';
+import { CompanyRole } from '../users/enums/role.enum';
 
 @Injectable()
 export class EmpresaService {
@@ -75,19 +76,35 @@ export class EmpresaService {
     }
 
     async update(id: number, updateEmpresaDTO: UpdateEmpresaDto): Promise<Empresa> {
-        const empresa = await this.findOne(id);
-        // Actualizar campos
-        Object.assign(empresa, {
-            ...updateEmpresaDTO,
-            logo: updateEmpresaDTO.logo && !updateEmpresaDTO.logo.startsWith('undefined')
-                ? updateEmpresaDTO.logo
-                : empresa.logo
-        });
-
         try {
+            const empresa = await this.findOne(id); // Asegúrate que findOne retorna Promise<Empresa>
+            
+            // Validación segura del logo
+            const logoValido = updateEmpresaDTO.logo && !updateEmpresaDTO.logo.startsWith('undefined');
+            
+            // Actualización manual de campos (evitando create con DeepPartial)
+            if (updateEmpresaDTO.nombre) empresa.nombre = updateEmpresaDTO.nombre;
+            if (updateEmpresaDTO.ruc) empresa.ruc = updateEmpresaDTO.ruc;
+            if (logoValido) empresa.logo = updateEmpresaDTO.logo;
+            
+            // Actualizar fecha manualmente si existe en tu entidad
+            if ('updatedAt' in empresa) {
+                empresa.updatedAt = new Date();
+            }
+    
             return await this.empresaRepository.save(empresa);
-        } catch (error) {
-            throw new BadRequestException('Error al actualizar la empresa: ' + error.message);
+        } catch (error: unknown) {
+            if (error instanceof NotFoundException) {
+                throw error;
+            }
+    
+            // Manejo específico de errores de PostgreSQL
+            if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
+                throw new ConflictException('El nombre o RUC de la empresa ya existe');
+            }
+    
+            console.error(`Error actualizando empresa ID ${id}:`, error);
+            throw new InternalServerErrorException('Error al actualizar la empresa');
         }
     }
 

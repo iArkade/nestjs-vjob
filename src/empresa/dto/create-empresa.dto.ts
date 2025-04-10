@@ -9,7 +9,7 @@ export class CreateEmpresaDto {
      })
      @IsNotEmpty()
      @IsString()
-     codigo: string;
+     codigo!: string;
 
      @ApiProperty({
           description: 'El RUC de la empresa',
@@ -17,7 +17,7 @@ export class CreateEmpresaDto {
      })
      @IsNotEmpty()
      @IsString()
-     ruc: string;
+     ruc!: string;
 
      @ApiProperty({
           description: 'El nombre de la empresa',
@@ -25,15 +25,15 @@ export class CreateEmpresaDto {
      })
      @IsNotEmpty()
      @IsString()
-     nombre: string;
+     nombre!: string;
 
      @ApiProperty({
           description: 'El correo de la empresa',
           example: 'Activo',
      })
      @IsNotEmpty()
-     @IsEmail() 
-     correo: string;
+     @IsEmail()
+     correo!: string;
 
      @ApiProperty({
           description: 'El telefono de la empresa',
@@ -41,7 +41,7 @@ export class CreateEmpresaDto {
      })
      @IsNotEmpty()
      @IsString()
-     telefono: string;
+     telefono!: string;
 
      @ApiProperty({
           description: 'La direccion de la empresa',
@@ -49,7 +49,7 @@ export class CreateEmpresaDto {
      })
      @IsNotEmpty()
      @IsString()
-     direccion: string;
+     direccion!: string;
 
      @ApiProperty({
           description: 'La URL del logo de la empresa',

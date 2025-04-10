@@ -11,7 +11,7 @@ export class CreateAccountingPlanDto {
   @Matches(/^\d+(\.\d+)*$/, {
     message: "The code must follow the format 1, 1.1, etc.",
   })
-  code: string;
+  code!: string;
 
   @ApiProperty({
     description: "The name of the accounting plan",
@@ -19,7 +19,7 @@ export class CreateAccountingPlanDto {
   })
   @IsNotEmpty()
   @IsString()
-  name: string;
+  name!: string;
 
   @ApiProperty({
     description: "The id of the company",
@@ -27,5 +27,5 @@ export class CreateAccountingPlanDto {
   })
   @IsNumber()
   @IsNotEmpty()
-  empresa_id: number;
+  empresa_id!: number;
 }

@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { UsersModule } from 'src/users/users.module';
+import { UsersModule } from '../users/users.module';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config'; // Asegúrate de importar ConfigModule
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Usuario } from 'src/users/entities/user.entity';
-import { Empresa } from 'src/empresa/entities/empresa.entity';
-import { UsuarioEmpresa } from 'src/usuario_empresa/entities/usuario_empresa.entity';
+import { Usuario } from '../users/entities/user.entity';
+import { Empresa } from '../empresa/entities/empresa.entity';
+import { UsuarioEmpresa } from '../usuario_empresa/entities/usuario_empresa.entity';
 import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './strategies/jwt.strategy';
 

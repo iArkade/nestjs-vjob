@@ -5,5 +5,5 @@ export class LogoutDto {
           description: 'User ID of the user logging out',
           example: 1,
      })
-     userId: number;
+     userId!: number;
 }

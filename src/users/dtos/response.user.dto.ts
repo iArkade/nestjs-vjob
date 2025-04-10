@@ -4,29 +4,29 @@ import { AssignCompanyDto } from "./create.user.dto";
 
 export class UserResponseDto {
     @ApiProperty({ example: 1 })
-    id: number;
+    id!: number;
 
     @ApiProperty({ example: 'usuario@ejemplo.com' })
-    email: string;
+    email!: string;
 
     @ApiProperty({ example: 'Juan' })
-    name: string;
+    name!: string;
 
     @ApiProperty({ example: 'Pérez' })
-    lastname: string;
+    lastname!: string;
 
     @ApiProperty({ enum: SystemRole, example: SystemRole.USER })
-    systemRole: SystemRole;
+    systemRole!: SystemRole;
 
     @ApiProperty({ example: true })
-    active: boolean;
+    active!: boolean;
 
-    @ApiProperty({ 
+    @ApiProperty({
         description: 'Lista de empresas asignadas',
-        type: [AssignCompanyDto] 
+        type: [AssignCompanyDto]
     })
-    empresas: AssignCompanyDto[];
+    empresas!: AssignCompanyDto[];
 
     @ApiProperty({ example: '2024-02-11T12:00:00.000Z' })
-    createdAt: Date;
+    createdAt!: Date;
 }

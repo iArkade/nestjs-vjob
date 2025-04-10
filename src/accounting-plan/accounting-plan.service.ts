@@ -9,7 +9,7 @@ import { UpdateAccountingPlanDto } from './dto/update-accounting-plan.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { AccountingPlan } from './entities/accounting-plan.entity';
 import { Like, Repository } from 'typeorm';
-import { AsientoItem } from 'src/asiento/entities/asiento-item.entity';
+import { AsientoItem } from '../asiento/entities/asiento-item.entity';
 
 @Injectable()
 export class AccountingPlanService {
