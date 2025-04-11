@@ -16,9 +16,11 @@ import { Permisos } from './permisos/entities/permisos.entity';
 import { ReportesModule } from './reportes/reportes.module';
 import { LoginHistoryModule } from './login-history/login-history.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter'; // Importa tu filtro
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRootAsync({
       useFactory: () => dataSourceOptions,
     }),
